@@ -236,7 +236,7 @@ void IMU_getValues(volatile float * values) {
 输入参数： 当前的测量值。
 输出参数：没有
 *******************************************************************************/
-#define Kp 4.0f   // proportional gain governs rate of convergence to accelerometer/magnetometer
+#define Kp 10.0f   // proportional gain governs rate of convergence to accelerometer/magnetometer
 #define Ki 0.01f   // integral gain governs rate of convergence of gyroscope biases
 void IMU_AHRSupdate(void) {
     float norm;

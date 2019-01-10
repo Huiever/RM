@@ -412,11 +412,6 @@
               <FilePath>..\HARDWARE\LED\led.c</FilePath>
             </File>
             <File>
-              <FileName>key.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\KEY\key.c</FilePath>
-            </File>
-            <File>
               <FileName>myiic.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\IIC\myiic.c</FilePath>
