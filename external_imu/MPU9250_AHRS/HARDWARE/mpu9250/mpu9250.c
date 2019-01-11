@@ -1,56 +1,32 @@
 #include "mpu9250.h"
 
-IMUDataTypedef imu_data = {0,0,0,0,0,0,0,0,0,0};
-IMUDataTypedef imu_data_offest = {0,0,0,0,-2,-15,12,0,0,0};
-  void initAK8963(void);
-//初始化MPU9250 
-//返回值:0,成功
-//    其他,错误代码
-u8 MPU9250_Init(void){
-        static volatile u8 res=0;
-    IIC_Init();     //初始化IIC总线
-    MPU_Write_Byte(MPU9250_ADDR,MPU_PWR_MGMT1_REG,0X80);//复位MPU9250
-    delay_ms(100);  //延时100ms
-    MPU_Write_Byte(MPU9250_ADDR,MPU_PWR_MGMT1_REG,0X00);//唤醒MPU9250
-    MPU_Set_Gyro_Fsr(3);					        	//陀螺仪传感器,±2000dps
-	  MPU_Set_Accel_Fsr(0);					       	 	//加速度传感器,±2g
-    MPU_Set_Rate(50);						       	 	  //设置采样率50Hz
-    MPU_Write_Byte(MPU9250_ADDR,MPU_INT_EN_REG,0X00);   //关闭所有中断
-	  MPU_Write_Byte(MPU9250_ADDR,MPU_USER_CTRL_REG,0X00);//I2C主模式关闭
-	  MPU_Write_Byte(MPU9250_ADDR,MPU_FIFO_EN_REG,0X00);	//关闭FIFO
-	  MPU_Write_Byte(MPU9250_ADDR,MPU_INTBP_CFG_REG,0X82);//INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
-    res=MPU_Read_Byte(MPU9250_ADDR,MPU_DEVICE_ID_REG);  //读取MPU6500的ID
-    if(res==MPU6500_ID){               //器件ID正确
+imu_t imu = {
+			{0,0,0,0,0,0,0,0,0,0},       //raw
+			{0,0,0,-2,-15,12,0,0,0},     //offset
+			{0,0,0,0,0,0,0,0,0,0,0,0,0}  //rip
+			};
 
-			MPU_Write_Byte(MPU9250_ADDR,MPU_PWR_MGMT1_REG,0X01);  	//设置CLKSEL,PLL X轴为参考
-			MPU_Write_Byte(MPU9250_ADDR,MPU_PWR_MGMT2_REG,0X00);  	//加速度与陀螺仪都工作
-			MPU_Set_Rate(50);						       	//设置采样率为50Hz 
-      printf("6500:%d    ",res); 		
-    }else return 1;
-		initAK8963();
-//    res=MPU_Read_Byte(AK8963_ADDR,MAG_WIA);    			//读取AK8963 ID   
-//    if(res==AK8963_ID){
-//			MPU_Write_Byte(AK8963_ADDR,MAG_CNTL2,0X01);		//复位AK8963
-//			delay_ms(50);
-//			MPU_Write_Byte(AK8963_ADDR,MAG_CNTL1,0X11);		//设置AK8963为单次测量模式
-//			printf("8963\r\n:%d",res); 	
-//    }else return 1;
+u8 MPU_WaitForReady(u8 devaddr);
+u8 MPU_Write_Byte(u8 devaddr,u8 reg,u8 data);
+u8 MPU_Read_Byte(u8 devaddr,u8 reg);
+u8 MPU_Set_Gyro_Fsr(u8 fsr);
+u8 MPU_Set_Accel_Fsr(u8 fsr);
+u8 MPU_Set_Rate(u16 rate);
+u8 MPU_Write_Len(u8 addr,u8 reg,u8 len,u8 *buf);
+u8 MPU_Read_Len(u8 addr,u8 reg,u8 len,u8 *buf);
 
-//    return 0;	
-}
-
-  void initAK8963(void)
+void AK8963_Init(void)
 {
   // First extract the factory calibration for each magnetometer axis
-  uint8_t rawData[3];  // x/y/z gyro calibration data stored here
+	  uint8_t rawData[3];  // x/y/z gyro calibration data stored here
   MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0x00); // Power down magnetometer  
   delay_ms(10);
   MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0x0F); // Enter Fuse ROM access mode
   delay_ms(10);
   MPU_Read_Len(AK8963_ADDR, 0x10, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
-//  destination[0] =  (float)(rawData[0] - 128)/256.0f + 1.0f;   // Return x-axis sensitivity adjustment values, etc.
-//  destination[1] =  (float)(rawData[1] - 128)/256.0f + 1.0f;  
-//  destination[2] =  (float)(rawData[2] - 128)/256.0f + 1.0f; 
+	//  destination[0] =  (float)(rawData[0] - 128)/256.0f + 1.0f;   // Return x-axis sensitivity adjustment values, etc.
+	//  destination[1] =  (float)(rawData[1] - 128)/256.0f + 1.0f;  
+	//  destination[2] =  (float)(rawData[2] - 128)/256.0f + 1.0f; 
   MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0x00); // Power down magnetometer  
   delay_ms(10);
   // Configure the magnetometer for continuous read and highest resolution
@@ -58,6 +34,40 @@ u8 MPU9250_Init(void){
   // and enable continuous mode data acquisition Mmode (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
   MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0x01 << 4 | 0x06); // Set magnetometer data resolution and sample ODR
   delay_ms(10);
+}
+//初始化MPU6500 
+//返回值:0,成功
+//    其他,错误代码
+u8 MPU9250_Init(void){
+		IIC_Init();     //初始化IIC总线
+		if(MPU6500_ID==MPU_Read_Byte(MPU9250_ADDR,MPU_DEVICE_ID_REG)){               //器件ID正确
+      printf("6500ID is correct!\r\n"); 
+			return 0;			
+    }else return 1;
+		
+		uint8_t MPU6500_Init_Data[8][2] = {
+		{MPU_PWR_MGMT1_REG,   0X80},      // 复位MPU9250
+		{MPU_PWR_MGMT1_REG,   0X00},      // 唤醒MPU9250
+		{MPU_INT_EN_REG,      0X00},         // 关闭所有中断
+		{MPU_USER_CTRL_REG,   0x00},      // I2C主模式关闭
+		{MPU_FIFO_EN_REG,     0X00},    // 关闭FIFO
+		{MPU_INTBP_CFG_REG,   0x82},       // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
+		{MPU_PWR_MGMT1_REG,   0x01},        // 设置CLKSEL,PLL X轴为参考
+		{MPU_PWR_MGMT2_REG,   0x00},          // 加速度与陀螺仪都工作
+		};
+
+		for(uint8_t index = 0; index < 8; index++){
+		MPU_Write_Byte(MPU9250_ADDR,MPU6500_Init_Data[index][0], MPU6500_Init_Data[index][1]);
+		delay_ms(1);
+		}
+		
+    MPU_Set_Gyro_Fsr(3);					        	//陀螺仪传感器,±2000dps
+	  MPU_Set_Accel_Fsr(0);					       	 	//加速度传感器,±2g
+    MPU_Set_Rate(50);						       	 	  //设置采样率50Hz
+		
+		AK8963_Init();
+		
+    return 0;	
 }
 
 //设置MPU9250陀螺仪传感器满量程范围
@@ -103,17 +113,15 @@ u8 MPU_Set_Rate(u16 rate) {
  	return MPU_Set_LPF(rate/2);	//自动设置LPF为采样率的一半
 }
 
-//得到温度值
-//返回值:温度值(扩大了100倍)
-short MPU_Get_Temperature(void){
+//得到温度值(原始值)
+void MPU_Get_Temperature(short *temp){
 	u8 buf[2]; 
-	short raw;
-	float temp;
 	MPU_Read_Len(MPU9250_ADDR,MPU_TEMP_OUTH_REG,2,buf); 
-	raw=((u16)buf[0]<<8)|buf[1];  
-	temp=21+((double)raw)/333.87;  
-	return temp*100;;
+	*temp=((u8)buf[0]<<8)|buf[1];  
+	//*temp=21+((double)raw)/333.87;  
 }
+
+
 //得到陀螺仪值(原始值)
 //gx,gy,gz:陀螺仪x,y,z轴的原始读数(带符号)
 //返回值:0,成功
@@ -174,36 +182,24 @@ void readMagData(short *mx,short *my,short *mz)
   }
 }
 
-int16_t imu_data_gz_last,imu_data_gx_last;
-//Get 6 axis data from MPU6500
-void IMU_Get_Raw_Data()
+//Get 9 axis data from MPU6500 & AK8963
+void IMU_Get_Raw_Data(void)
 {
-	int16_t gx,gy,gz,ax,ay,az,mx,my,mz;
-	
-	MPU_Get_Gyroscope(&gx,&gy,&gz);
-	MPU_Get_Accelerometer(&ax,&ay,&az);
-	MPU_Get_Magnetometer(&mx,&my,&mz);
-	
-	imu_data_gz_last=imu_data.gz;
-	imu_data_gx_last=imu_data.gx;
+	MPU_Get_Gyroscope(&imu.raw.gx,&imu.raw.gy,&imu.raw.gz);
+	MPU_Get_Accelerometer(&imu.raw.ax,&imu.raw.ay,&imu.raw.az);
+	MPU_Get_Magnetometer(&imu.raw.mx,&imu.raw.my,&imu.raw.mz);
+	MPU_Get_Temperature(&imu.raw.temp);
 
-  imu_data.ax = ax;
-  imu_data.ay = ay;
-  imu_data.az = az;
-  
-  //imu_data.temp = mpu_buff[6]<<8 |mpu_buff[7];
+  imu.raw.gx -= imu.offset.gx;
+  imu.raw.gy -= imu.offset.gy;
+  imu.raw.gz -= imu.offset.gz;
 	
-  imu_data.gx = gx - imu_data_offest.gx;
-  imu_data.gy = gy - imu_data_offest.gy;
-  imu_data.gz = gz - imu_data_offest.gz;
-	
-	imu_data.mx = mx - imu_data_offest.mx;
-	imu_data.my = my - imu_data_offest.my;
-	imu_data.mz = mz - imu_data_offest.mz;
-	
-//	printf("%d,%d,%d\r\n",ax,ay,az);
-//	printf("%d,%d,%d\r\n",gx,gy,gz);
-//	printf("%d,%d,%d\r\n",mx,my,mz);
+	imu.raw.mx -= imu.offset.mx;
+	imu.raw.my -= imu.offset.my;
+	imu.raw.mz -= imu.offset.mz;
+//	printf("mx:%d my:%d mz:%d\r\n",imu.raw.mx,imu.raw.my,imu.raw.mz);
+//	printf("ax:%d ay:%d az:%d\r\n",imu.raw.ax,imu.raw.ay,imu.raw.az);
+//	printf("gx:%d gy:%d gz:%d\r\n",imu.raw.gx,imu.raw.gy,imu.raw.gz);
 }
 
 //IIC连续写
@@ -305,3 +301,4 @@ u8 MPU_Read_Byte(u8 addr,u8 reg){
 	IIC_Stop();                 //产生一个停止条件
 	return res;  
 }
+

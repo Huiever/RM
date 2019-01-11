@@ -5,7 +5,6 @@
 #include "delay.h"
 #include "usart.h"
 
-
 //如果AD0脚(9脚)接地,IIC地址为0X68(不包含最低位).
 //如果接V3.3,则IIC地址为0X69(不包含最低位).
 #define MPU9250_ADDR      0X69    //MPU6500的器件IIC地址
@@ -95,37 +94,66 @@
 #define MPU_FIFO_RW_REG			  0X74  //FIFO读写寄存器
 #define MPU_DEVICE_ID_REG	    0X75	//器件ID寄存器
 
+
 typedef struct
 {
-  int16_t ax;     //加速度计
-  int16_t ay;
-  int16_t az;
-  
-  int16_t temp;
-  
-  int16_t gx;     //陀螺仪
-  int16_t gy;
-  int16_t gz;
-  
-  int16_t mx;
-  int16_t my;
-  int16_t mz;
-}IMUDataTypedef;
+	struct
+	{
+		int16_t ax;     //加速度计
+		int16_t ay;
+		int16_t az;
+	 
+		int16_t temp;
 
-extern IMUDataTypedef imu_data;
-extern IMUDataTypedef imu_data_offest;
+		int16_t gx;     //陀螺仪
+		int16_t gy;
+		int16_t gz;
+		
+		int16_t mx;
+		int16_t my;
+		int16_t mz;
+	}raw;	 //原始数据
+	struct
+	{
+		int16_t ax;     //加速度计
+		int16_t ay;
+		int16_t az;
+	 
+		int16_t gx;     //陀螺仪
+		int16_t gy;
+		int16_t gz;
+		
+		int16_t mx;
+		int16_t my;
+		int16_t mz;
+	}offset;  //偏移	
+	struct
+	{
+		float ax;
+		float ay;
+		float az;
+		
+		float gx; /*!< omiga, +- 2000dps => +-32768  so gx/16.4 =	deg/s */
+		float gy;
+		float gz;
+		
+		float mx;
+		float my;
+		float mz;
 
-void IMU_Get_Raw_Data();
+		float temp;
+
+		float rol;
+		float pit;
+		float yaw;
+	}rip;  //处理过的数据
+} imu_t;
+
+extern imu_t imu;
+
 u8 MPU9250_Init(void);
-u8 MPU_WaitForReady(u8 devaddr);
-u8 MPU_Write_Byte(u8 devaddr,u8 reg,u8 data);
-u8 MPU_Read_Byte(u8 devaddr,u8 reg);
-u8 MPU_Set_Gyro_Fsr(u8 fsr);
-u8 MPU_Set_Accel_Fsr(u8 fsr);
-u8 MPU_Set_Rate(u16 rate);
-u8 MPU_Write_Len(u8 addr,u8 reg,u8 len,u8 *buf);
-u8 MPU_Read_Len(u8 addr,u8 reg,u8 len,u8 *buf);
-short MPU_Get_Temperature(void);
+void IMU_Get_Raw_Data(void);
+void MPU_Get_Temperature(short *temp);
 u8 MPU_Get_Gyroscope(short *gx,short *gy,short *gz);
 u8 MPU_Get_Accelerometer(short *ax,short *ay,short *az);
 u8 MPU_Get_Magnetometer(short *mx,short *my,short *mz);

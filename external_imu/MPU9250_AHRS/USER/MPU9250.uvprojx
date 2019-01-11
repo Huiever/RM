@@ -431,11 +431,6 @@
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\mpu9250\angle.c</FilePath>
             </File>
-            <File>
-              <FileName>DataSave.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\mpu9250\DataSave.c</FilePath>
-            </File>
           </Files>
         </Group>
         <Group>
