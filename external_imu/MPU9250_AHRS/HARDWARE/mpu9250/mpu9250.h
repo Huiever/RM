@@ -4,6 +4,9 @@
 #include "myiic.h"
 #include "delay.h"
 #include "usart.h"
+#include "timer.h"
+#include "math.h"
+
 
 //如果AD0脚(9脚)接地,IIC地址为0X68(不包含最低位).
 //如果接V3.3,则IIC地址为0X69(不包含最低位).
@@ -94,7 +97,6 @@
 #define MPU_FIFO_RW_REG			  0X74  //FIFO读写寄存器
 #define MPU_DEVICE_ID_REG	    0X75	//器件ID寄存器
 
-
 typedef struct
 {
 	struct
@@ -157,5 +159,12 @@ void MPU_Get_Temperature(short *temp);
 u8 MPU_Get_Gyroscope(short *gx,short *gy,short *gz);
 u8 MPU_Get_Accelerometer(short *ax,short *ay,short *az);
 u8 MPU_Get_Magnetometer(short *mx,short *my,short *mz);
+
+void Init_Quaternion(void);
+void GetPitchYawGxGyGz(void);
+void IMU_AHRSupdate(void);
+void IMU_getValues(void);
+extern volatile float yaw,pitch,roll; //使用到的角度值，这里是最终的三轴数据
+void filterUpdate(float gx, float gy, float gz, float ax, float ay, float az);
 
 #endif
