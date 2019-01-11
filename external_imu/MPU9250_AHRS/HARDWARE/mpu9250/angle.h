@@ -9,5 +9,5 @@ void GetPitchYawGxGyGz(void);
 void IMU_AHRSupdate(void);
 void IMU_getValues(void);
 extern volatile float yaw,pitch,roll; //使用到的角度值，这里是最终的三轴数据
-
+void filterUpdate(float gx, float gy, float gz, float ax, float ay, float az);
 #endif
