@@ -1,6 +1,6 @@
 #include "driver.h"
 
-void DRIVER_INIT(void)
+void driver_init(void)
 {
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置系统中断优先级分组2
 	delay_init(168);  //初始化延时函数

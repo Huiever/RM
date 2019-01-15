@@ -2,16 +2,18 @@
 
 imu_t imu = {
 			{0,0,0,0,0,0,0,0,0,0},       //raw
-			{0,0,0,-2,-15,12,0,0,0},     //offset
+			{0,0,0,-2,-15,12,
+				{0.0014f, 0.1671f,-0.1680f,0.9609f,-0.0105f, 0.0065f,0.9622f,-0.0696f,1.0866f}
+			},     //offset
 			{0,0,0,0,0,0,0,0,0,0,0,0,0}  //rip
 			};
-
+	
 volatile float q0 = 1.0f;
 volatile float q1 = 0.0f;
 volatile float q2 = 0.0f;
 volatile float q3 = 0.0f;
 
-int16_t MPU6050_FIFO[6][11] = {0};//[0]-[9]为最近10次数据 [10]为10次数据的平均值
+int32_t MPU6050_FIFO[6][11] = {0};//[0]-[9]为最近10次数据 [10]为10次数据的平均值
 int16_t AK8963_FIFO[3][11] = {0};//[0]-[9]为最近10次数据 [10]为10次数据的平均值 注：磁传感器的采样频率慢，所以单独列出
 			
 u8 MPU_WaitForReady(u8 devaddr);
@@ -26,12 +28,12 @@ u8 MPU_Read_Len(u8 addr,u8 reg,u8 len,u8 *buf);
 void AK8963_Init(void)
 {
   // First extract the factory calibration for each magnetometer axis
-	  uint8_t rawData[3];  // x/y/z gyro calibration data stored here
+	//	uint8_t rawData[3];  // x/y/z gyro calibration data stored here
   MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0x00); // Power down magnetometer  
   delay_ms(10);
   MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0x0F); // Enter Fuse ROM access mode
   delay_ms(10);
-  MPU_Read_Len(AK8963_ADDR, 0x10, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
+	//  MPU_Read_Len(AK8963_ADDR, 0x10, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
 	//  destination[0] =  (float)(rawData[0] - 128)/256.0f + 1.0f;   // Return x-axis sensitivity adjustment values, etc.
 	//  destination[1] =  (float)(rawData[1] - 128)/256.0f + 1.0f;  
 	//  destination[2] =  (float)(rawData[2] - 128)/256.0f + 1.0f; 
@@ -46,25 +48,34 @@ void AK8963_Init(void)
 //初始化MPU6500 
 //返回值:0,成功
 //    其他,错误代码
-u8 MPU9250_Init(void){
+u8 imu_init(void){
 		IIC_Init();     //初始化IIC总线
 		if(MPU6500_ID==MPU_Read_Byte(MPU9250_ADDR,MPU_DEVICE_ID_REG)){               //器件ID正确
       printf("6500ID is correct!\r\n"); 
 			return 0;			
     }else return 1;
 		
-		uint8_t MPU6500_Init_Data[8][2] = {
-		{MPU_PWR_MGMT1_REG,   0X80},      // 复位MPU9250
-		{MPU_PWR_MGMT1_REG,   0X00},      // 唤醒MPU9250
-		{MPU_INT_EN_REG,      0X00},         // 关闭所有中断
-		{MPU_USER_CTRL_REG,   0x00},      // I2C主模式关闭
-		{MPU_FIFO_EN_REG,     0X00},    // 关闭FIFO
-		{MPU_INTBP_CFG_REG,   0x82},       // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
-		{MPU_PWR_MGMT1_REG,   0x01},        // 设置CLKSEL,PLL X轴为参考
-		{MPU_PWR_MGMT2_REG,   0x00},          // 加速度与陀螺仪都工作
+//		uint8_t MPU6500_Init_Data[8][2] = {
+//		{MPU_PWR_MGMT1_REG,   0X80},      // 复位MPU9250
+//		{MPU_PWR_MGMT1_REG,   0X00},      // 唤醒MPU9250
+//		{MPU_INT_EN_REG,      0X00},      // 关闭所有中断
+//		{MPU_USER_CTRL_REG,   0x00},      // I2C主模式关闭
+//		{MPU_FIFO_EN_REG,     0X00},      // 关闭FIFO
+//		{MPU_INTBP_CFG_REG,   0x82},      // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
+//		{MPU_PWR_MGMT1_REG,   0x01},      // 设置CLKSEL,PLL X轴为参考
+//		{MPU_PWR_MGMT2_REG,   0x00},      // 加速度与陀螺仪都工作
+//		};
+		
+		uint8_t MPU6500_Init_Data[6][2] = {
+		{MPU_PWR_MGMT1_REG,   0X00},      
+		{MPU_PWR_MGMT1_REG,   0X01},      
+		{MPU_CFG_REG,         0X03},         
+		{MPU_SAMPLE_RATE_REG, 0x04},      
+		{MPU_INTBP_CFG_REG,   0x22},       
+		{MPU_INT_EN_REG,      0x01},        
 		};
 
-		for(uint8_t index = 0; index < 8; index++){
+		for(uint8_t index = 0; index < 6; index++){
 		MPU_Write_Byte(MPU9250_ADDR,MPU6500_Init_Data[index][0], MPU6500_Init_Data[index][1]);
 		delay_ms(1);
 		}
@@ -122,10 +133,10 @@ u8 MPU_Set_Rate(u16 rate) {
 }
 
 //得到温度值(原始值)
-void MPU_Get_Temperature(short *temp){
+void MPU_Get_Temperature(int16_t *temp){
 	u8 buf[2]; 
 	MPU_Read_Len(MPU9250_ADDR,MPU_TEMP_OUTH_REG,2,buf); 
-	*temp=((u8)buf[0]<<8)|buf[1];  
+	*temp=((int16_t)buf[0]<<8)|buf[1];  
 	//*temp=21+((double)raw)/333.87;  
 }
 
@@ -134,13 +145,13 @@ void MPU_Get_Temperature(short *temp){
 //gx,gy,gz:陀螺仪x,y,z轴的原始读数(带符号)
 //返回值:0,成功
 //    其他,错误代码
-u8 MPU_Get_Gyroscope(short *gx,short *gy,short *gz){
+u8 MPU_Get_Gyroscope(int16_t *gx,int16_t *gy,int16_t *gz){
 	u8 buf[6],res; 
 	res=MPU_Read_Len(MPU9250_ADDR,MPU_GYRO_XOUTH_REG,6,buf);
 	if(res==0){
-		*gx=((u16)buf[0]<<8)|buf[1];  
-		*gy=((u16)buf[2]<<8)|buf[3];  
-		*gz=((u16)buf[4]<<8)|buf[5];
+		*gx=((int16_t)buf[0]<<8)|buf[1];  
+		*gy=((int16_t)buf[2]<<8)|buf[3];  
+		*gz=((int16_t)buf[4]<<8)|buf[5];
 	} 	
 	return res;;
 }
@@ -148,13 +159,13 @@ u8 MPU_Get_Gyroscope(short *gx,short *gy,short *gz){
 //gx,gy,gz:陀螺仪x,y,z轴的原始读数(带符号)
 //返回值:0,成功
 //    其他,错误代码
-u8 MPU_Get_Accelerometer(short *ax,short *ay,short *az){
+u8 MPU_Get_Accelerometer(int16_t *ax,int16_t *ay,int16_t *az){
 	u8 buf[6],res;  
 	res=MPU_Read_Len(MPU9250_ADDR,MPU_ACCEL_XOUTH_REG,6,buf);
 	if(res==0){
-		*ax=((u16)buf[0]<<8)|buf[1];  
-		*ay=((u16)buf[2]<<8)|buf[3];  
-		*az=((u16)buf[4]<<8)|buf[5];
+		*ax=((int16_t)buf[0]<<8)|buf[1];  
+		*ay=((int16_t)buf[2]<<8)|buf[3];  
+		*az=((int16_t)buf[4]<<8)|buf[5];
 	} 	
 	return res;;
 }
@@ -163,20 +174,20 @@ u8 MPU_Get_Accelerometer(short *ax,short *ay,short *az){
 //mx,my,mz:磁力计x,y,z轴的原始读数(带符号)
 //返回值:0,成功
 //    其他,错误代码
-u8 MPU_Get_Magnetometer(short *mx,short *my,short *mz){
+u8 MPU_Get_Magnetometer(int16_t *mx,int16_t *my,int16_t *mz){
 	u8 buf[7],res;  
 	MPU_Read_Len(AK8963_ADDR,MAG_XOUT_L,7,buf);
 	res = buf[6];
 	if(!(res&0x08)){
-		*mx=((u16)buf[1]<<8)|buf[0];  
-		*my=((u16)buf[3]<<8)|buf[2];  
-		*mz=((u16)buf[5]<<8)|buf[4];
+		*mx=((int16_t)buf[1]<<8)|buf[0];  
+		*my=((int16_t)buf[3]<<8)|buf[2];  
+		*mz=((int16_t)buf[5]<<8)|buf[4];
 	}
-	//MPU_Write_Byte(AK8963_ADDR,MAG_CNTL1,0X11); //AK8963每次读完以后都需要重新设置为单次测量模式
+	MPU_Write_Byte(AK8963_ADDR,MAG_CNTL1,0X11); //AK8963每次读完以后都需要重新设置为单次测量模式
 	return !res;;
 }
 
-void readMagData(short *mx,short *my,short *mz)
+void readMagData(int16_t *mx,int16_t *my,int16_t *mz)
 {
   uint8_t rawData[7];  // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
   if(MPU_Read_Byte(AK8963_ADDR, 0x02) & 0x01) { // wait for magnetometer data ready bit to be set
@@ -184,131 +195,58 @@ void readMagData(short *mx,short *my,short *mz)
   uint8_t c = rawData[6]; // End data read by reading ST2 register
     if(!(c & 0x08)) { // Check if magnetic sensor overflow set, if not then report data
     *mx= (int16_t)(((int16_t)rawData[1] << 8) | rawData[0]);  // Turn the MSB and LSB into a signed 16-bit value
-    *my = (int16_t)(((int16_t)rawData[3] << 8) | rawData[2]) ;  // Data stored as little Endian
-    *mz = (int16_t)(((int16_t)rawData[5] << 8) | rawData[4]) ; 
+    *my= (int16_t)(((int16_t)rawData[3] << 8) | rawData[2]) ;  // Data stored as little Endian
+    *mz= (int16_t)(((int16_t)rawData[5] << 8) | rawData[4]) ; 
    }
   }
 }
 
+
+void imu_calibrate(){
+	
+	float tempx,tempy,tempz;
+	tempx=(float)(imu.raw.mx /1000-imu.offset.mag.mx);
+	tempy=(float)(imu.raw.my /1000-imu.offset.mag.my);
+	tempz=(float)(imu.raw.mz /1000-imu.offset.mag.mz);
+	#if ELLIPSOID_FIT
+		imu.rip.mx=imu.offset.mag.b0*tempx+imu.offset.mag.b1*tempy+imu.offset.mag.b2*tempz;
+		imu.rip.my=imu.offset.mag.b1*tempx+imu.offset.mag.b3*tempy+imu.offset.mag.b4*tempz;
+		imu.rip.mz=imu.offset.mag.b2*tempx+imu.offset.mag.b4*tempy+imu.offset.mag.b5*tempz;
+	#else
+		imu.rip.mx=tempx;
+		imu.rip.my=tempy;
+		imu.rip.mz=tempz;
+	#endif
+	imu.raw.mx=(int16_t)(imu.rip.mx*1000);
+	imu.raw.my=(int16_t)(imu.rip.my*1000);
+	imu.raw.mz=(int16_t)(imu.rip.mz*1000);
+	
+	imu.raw.gx -= imu.offset.gx;
+	imu.raw.gy -= imu.offset.gy;
+	imu.raw.gz -= imu.offset.gz;
+}
+	
+
 //Get 9 axis data from MPU6500 & AK8963
-void IMU_Get_Raw_Data(void)
+void imu_get_raw_data(void)
 {
 	MPU_Get_Gyroscope(&imu.raw.gx,&imu.raw.gy,&imu.raw.gz);
 	MPU_Get_Accelerometer(&imu.raw.ax,&imu.raw.ay,&imu.raw.az);
 	MPU_Get_Magnetometer(&imu.raw.mx,&imu.raw.my,&imu.raw.mz);
 	MPU_Get_Temperature(&imu.raw.temp);
 
-  imu.raw.gx -= imu.offset.gx;
-  imu.raw.gy -= imu.offset.gy;
-  imu.raw.gz -= imu.offset.gz;
+//	imu_calibrate();    //此处有问题
 	
-	imu.raw.mx -= imu.offset.mx;
-	imu.raw.my -= imu.offset.my;
-	imu.raw.mz -= imu.offset.mz;
-//	printf("mx:%d my:%d mz:%d\r\n",imu.raw.mx,imu.raw.my,imu.raw.mz);
-//	printf("ax:%d ay:%d az:%d\r\n",imu.raw.ax,imu.raw.ay,imu.raw.az);
-//	printf("gx:%d gy:%d gz:%d\r\n",imu.raw.gx,imu.raw.gy,imu.raw.gz);
+//	imu.raw.mx -= imu.offset.mx;
+//	imu.raw.my -= imu.offset.my;
+//	imu.raw.mz -= imu.offset.mz;
+	
+	imu.raw.gx -= imu.offset.gx;
+	imu.raw.gy -= imu.offset.gy;
+	imu.raw.gz -= imu.offset.gz;
+
 }
 
-//IIC连续写
-//addr:器件地址 
-//reg:寄存器地址
-//len:写入长度
-//buf:数据区
-//返回值:0,正常
-//    其他,错误代码
-u8 MPU_Write_Len(u8 addr,u8 reg,u8 len,u8 *buf){
-	u8 i;
-	IIC_Start();
-	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
-	if(IIC_Wait_Ack()){          //等待应答
-		IIC_Stop();
-		return 1;
-	}
-	IIC_Send_Byte(reg);         //写寄存器地址
-	IIC_Wait_Ack();             //等待应答
-	for(i=0;i<len;i++){
-		IIC_Send_Byte(buf[i]);  //发送数据
-		if(IIC_Wait_Ack()){      //等待ACK
-			IIC_Stop();
-			return 1;
-		}
-	}
-	IIC_Stop();
-	return 0;
-} 
-
-//IIC连续读
-//addr:器件地址
-//reg:要读取的寄存器地址
-//len:要读取的长度
-//buf:读取到的数据存储区
-//返回值:0,正常
-//    其他,错误代码
-u8 MPU_Read_Len(u8 addr,u8 reg,u8 len,u8 *buf){ 
-	IIC_Start();
-	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
-	if(IIC_Wait_Ack()){          //等待应答
-		IIC_Stop();
-		return 1;
-	}
-	IIC_Send_Byte(reg);         //写寄存器地址
-	IIC_Wait_Ack();             //等待应答
-	IIC_Start();                
-	IIC_Send_Byte((addr<<1)|1); //发送器件地址+读命令
-	IIC_Wait_Ack();             //等待应答
-	while(len){
-		if(len==1)
-			*buf=IIC_Read_Byte(0);//读数据,发送nACK 
-		else
-			*buf=IIC_Read_Byte(1);		//读数据,发送ACK  
-		len--;
-		buf++;  
-	}
-	IIC_Stop();                 //产生一个停止条件
-	return 0;       
-}
-
-//IIC写一个字节 
-//devaddr:器件IIC地址
-//reg:寄存器地址
-//data:数据
-//返回值:0,正常
-//    其他,错误代码
-u8 MPU_Write_Byte(u8 addr,u8 reg,u8 data){
-	IIC_Start();
-	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
-	if(IIC_Wait_Ack()){          //等待应答
-		IIC_Stop();
-		return 1;
-	}
-	IIC_Send_Byte(reg);         //写寄存器地址
-	IIC_Wait_Ack();             //等待应答
-	IIC_Send_Byte(data);        //发送数据
-	if(IIC_Wait_Ack()){          //等待ACK
-		IIC_Stop();
-		return 1;
-	}
-	IIC_Stop();
-	return 0;
-}
-//IIC读一个字节 
-//reg:寄存器地址 
-//返回值:读到的数据
-u8 MPU_Read_Byte(u8 addr,u8 reg){
-	u8 res;
-	IIC_Start();
-	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
-	IIC_Wait_Ack();             //等待应答
-	IIC_Send_Byte(reg);         //写寄存器地址
-	IIC_Wait_Ack();             //等待应答
-	IIC_Start();                
-	IIC_Send_Byte((addr<<1)|1); //发送器件地址+读命令
-	IIC_Wait_Ack();             //等待应答
-	res=IIC_Read_Byte(0);		//读数据,发送nACK  
-	IIC_Stop();                 //产生一个停止条件
-	return res;  
-}
 
 // Fast inverse square-root
 /**************************实现函数********************************************
@@ -331,12 +269,10 @@ float invSqrt(float x) {
 /*将MPU6050_ax,MPU6050_ay, MPU6050_az,MPU6050_gx, MPU6050_gy, MPU6050_gz处理后存储*/
 /**********************************************************************************/
 
-void MPU6500_DataSave(int16_t ax,int16_t ay,int16_t az,int16_t gx,int16_t gy,int16_t gz){ //[0]-[9]为最近10次数据 [10]为10次数据的平均值
+//[0]-[9]为最近10次数据 [10]为10次数据的平均值
+void mpu6500_datasave(int16_t ax,int16_t ay,int16_t az,int16_t gx,int16_t gy,int16_t gz){
 
-	uint8_t i = 0;
-	int32_t sum=0;
-	
-	for(i=1;i<10;i++){
+	for(uint8_t i=1;i<10;i++){
 		MPU6050_FIFO[0][i-1]=MPU6050_FIFO[0][i];
 		MPU6050_FIFO[1][i-1]=MPU6050_FIFO[1][i];
 		MPU6050_FIFO[2][i-1]=MPU6050_FIFO[2][i];
@@ -352,100 +288,31 @@ void MPU6500_DataSave(int16_t ax,int16_t ay,int16_t az,int16_t gx,int16_t gy,int
 	MPU6050_FIFO[4][9]=gy;
 	MPU6050_FIFO[5][9]=gz;
 	
-	for(i=0;i<10;i++){     //求当前数组的合，再取平均值	
-		 sum+=MPU6050_FIFO[0][i];
+	for(uint8_t j=0;j<6;j++){
+			for(uint8_t i=0;i<10;i++){
+				MPU6050_FIFO[j][10]+=MPU6050_FIFO[j][i]; //数据量大，int16_t会溢出
+			}
+			MPU6050_FIFO[j][10]=MPU6050_FIFO[j][10]/10;
 	}
-	MPU6050_FIFO[0][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=MPU6050_FIFO[1][i];
-	}
-	MPU6050_FIFO[1][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=MPU6050_FIFO[2][i];
-	}
-	MPU6050_FIFO[2][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=MPU6050_FIFO[3][i];
-	}
-	MPU6050_FIFO[3][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=MPU6050_FIFO[4][i];
-	}
-	MPU6050_FIFO[4][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=MPU6050_FIFO[5][i];
-	}
-	MPU6050_FIFO[5][10]=sum/10;
-	
 }
 
-void AK8963_DataSave(int16_t x,int16_t y,int16_t z)
-{
-	uint8_t i = 0;
-	int32_t sum=0;
+void ak8963_datasave(int16_t mx,int16_t my,int16_t mz){
 
-	for(i=1;i<10;i++){
+	for(uint8_t i=1;i<10;i++){
 		AK8963_FIFO[0][i-1]=AK8963_FIFO[0][i];
 		AK8963_FIFO[1][i-1]=AK8963_FIFO[1][i];
 		AK8963_FIFO[2][i-1]=AK8963_FIFO[2][i];
 	}
-	AK8963_FIFO[0][9]= x;//将新的数据放置到 数据的最后面
-	AK8963_FIFO[1][9]= y;
-	AK8963_FIFO[2][9]= z;
+	AK8963_FIFO[0][9]= mx;//将新的数据放置到 数据的最后面
+	AK8963_FIFO[1][9]= my;
+	AK8963_FIFO[2][9]= mz;
 	
-	for(i=0;i<10;i++)//求当前数组的合，再取平均值
-	{	
-		 sum+=AK8963_FIFO[0][i];
+	for(uint8_t j=0;j<3;j++){
+		for(uint8_t i=0;i<10;i++){
+			AK8963_FIFO[j][10]+=AK8963_FIFO[j][i];
+		}
+		AK8963_FIFO[j][10]=AK8963_FIFO[j][10]/10;
 	}
-	AK8963_FIFO[0][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=AK8963_FIFO[1][i];
-	}
-	AK8963_FIFO[1][10]=sum/10;
-
-	sum=0;
-	for(i=0;i<10;i++){
-		 sum+=AK8963_FIFO[2][i];
-	}
-	AK8963_FIFO[2][10]=sum/10;
-//		if(MagMaxMinData.MinMagX>HMC5883_FIFO[0][10])
-//	{
-//		MagMaxMinData.MinMagX=(int16_t)HMC5883_FIFO[0][10];
-//	}
-//	if(MagMaxMinData.MinMagY>HMC5883_FIFO[1][10])
-//	{
-//		MagMaxMinData.MinMagY=(int16_t)HMC5883_FIFO[1][10];
-//	}
-//	if(MagMaxMinData.MinMagZ>HMC5883_FIFO[2][10])
-//	{
-//		MagMaxMinData.MinMagZ=(int16_t)HMC5883_FIFO[2][10];
-//	}
-
-//	if(MagMaxMinData.MaxMagX<HMC5883_FIFO[0][10])
-//	{
-//		MagMaxMinData.MaxMagX=(int16_t)HMC5883_FIFO[0][10];		
-//	}
-//	if(MagMaxMinData.MaxMagY<HMC5883_FIFO[1][10])
-//	{
-//		MagMaxMinData.MaxMagY = HMC5883_FIFO[1][10];
-//	}
-//	if(MagMaxMinData.MaxMagZ<HMC5883_FIFO[2][10])
-//	{
-//		MagMaxMinData.MaxMagZ=(int16_t)HMC5883_FIFO[2][10];
-//	}		
-//	}
 }
 
 void AK8963_getlastValues(int16_t *x,int16_t *y,int16_t *z) 
@@ -742,21 +609,21 @@ void IMU_AHRSupdate(void) {
 *******************************************************************************/
 void IMU_getValues(void) {  
 
-	IMU_Get_Raw_Data();
-	MPU6500_DataSave(imu.raw.ax,imu.raw.ay,imu.raw.az,imu.raw.gx,imu.raw.gy,imu.raw.gz); 
-	AK8963_DataSave(imu.raw.mx, imu.raw.my, imu.raw.mz);
+	imu_get_raw_data();
+	mpu6500_datasave(imu.raw.ax,imu.raw.ay,imu.raw.az,imu.raw.gx,imu.raw.gy,imu.raw.gz); 
+	ak8963_datasave(imu.raw.mx, imu.raw.my, imu.raw.mz);
 	
-	imu.raw.ax=(float) MPU6050_FIFO[0][10];
-	imu.raw.ay=(float) MPU6050_FIFO[1][10];
-	imu.raw.az=(float) MPU6050_FIFO[2][10];
+	imu.raw.ax=(int16_t) MPU6050_FIFO[0][10];
+	imu.raw.ay=(int16_t) MPU6050_FIFO[1][10];
+	imu.raw.az=(int16_t) MPU6050_FIFO[2][10];
 	
-	imu.raw.gx=(float) MPU6050_FIFO[3][10];
-	imu.raw.gy=(float) MPU6050_FIFO[4][10];
-	imu.raw.gz=(float) MPU6050_FIFO[5][10];
+	imu.raw.gx=(int16_t) MPU6050_FIFO[3][10];
+	imu.raw.gy=(int16_t) MPU6050_FIFO[4][10];
+	imu.raw.gz=(int16_t) MPU6050_FIFO[5][10];
 
-	imu.raw.mx=(float) AK8963_FIFO[0][10];
-	imu.raw.my=(float) AK8963_FIFO[1][10];
-	imu.raw.mz=(float) AK8963_FIFO[2][10];
+	imu.raw.mx=(int16_t) AK8963_FIFO[0][10];
+	imu.raw.my=(int16_t) AK8963_FIFO[1][10];
+	imu.raw.mz=(int16_t) AK8963_FIFO[2][10];
 	
 //	//+-2g  16384  单位:g
 //	imu.rip.ax=imu.raw.ax/16384;
@@ -764,15 +631,11 @@ void IMU_getValues(void) {
 //	imu.rip.az=imu.raw.az/16384;
 	
 	//+-2000   16.4  单位:rad/s
-	imu.rip.gx=imu.raw.gx/16.4f/57.3f;
-	imu.rip.gy=imu.raw.gy/16.4f/57.3f;
-	imu.rip.gz=imu.raw.gz/16.4f/57.3f;
+	imu.rip.gx=(float)(imu.raw.gx/16.4f/57.3f);
+	imu.rip.gy=(float)(imu.raw.gy/16.4f/57.3f);
+	imu.rip.gz=(float)(imu.raw.gz/16.4f/57.3f);
 	
-//	//单位:高斯
-//	imu.rip.mx=imu.raw.mx/1000;
-//	imu.rip.my=imu.raw.my/1000;
-//	imu.rip.mz=imu.raw.mz/1000;
-//	
+
 //	//单位:摄氏度
 //	imu.rip.temp=21+((double)imu.raw.temp)/333.87;
 
@@ -809,7 +672,7 @@ void Recorret_offset_g(void)
 	while(i<1000)
 	{
 		i++;
-    IMU_Get_Raw_Data();
+    imu_get_raw_data();
 		sum[0]+=imu.raw.gx;
 		sum[1]+=imu.raw.gy;
 		sum[2]+=imu.raw.gz;	
@@ -892,3 +755,104 @@ void Recorret_offset_g(void)
 //q3=SEq_4 ;
 
 //}
+
+
+//IIC连续写
+//addr:器件地址 
+//reg:寄存器地址
+//len:写入长度
+//buf:数据区
+//返回值:0,正常
+//    其他,错误代码
+u8 MPU_Write_Len(u8 addr,u8 reg,u8 len,u8 *buf){
+	u8 i;
+	IIC_Start();
+	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
+	if(IIC_Wait_Ack()){          //等待应答
+		IIC_Stop();
+		return 1;
+	}
+	IIC_Send_Byte(reg);         //写寄存器地址
+	IIC_Wait_Ack();             //等待应答
+	for(i=0;i<len;i++){
+		IIC_Send_Byte(buf[i]);  //发送数据
+		if(IIC_Wait_Ack()){      //等待ACK
+			IIC_Stop();
+			return 1;
+		}
+	}
+	IIC_Stop();
+	return 0;
+} 
+
+//IIC连续读
+//addr:器件地址
+//reg:要读取的寄存器地址
+//len:要读取的长度
+//buf:读取到的数据存储区
+//返回值:0,正常
+//    其他,错误代码
+u8 MPU_Read_Len(u8 addr,u8 reg,u8 len,u8 *buf){ 
+	IIC_Start();
+	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
+	if(IIC_Wait_Ack()){          //等待应答
+		IIC_Stop();
+		return 1;
+	}
+	IIC_Send_Byte(reg);         //写寄存器地址
+	IIC_Wait_Ack();             //等待应答
+	IIC_Start();                
+	IIC_Send_Byte((addr<<1)|1); //发送器件地址+读命令
+	IIC_Wait_Ack();             //等待应答
+	while(len){
+		if(len==1)
+			*buf=IIC_Read_Byte(0);//读数据,发送nACK 
+		else
+			*buf=IIC_Read_Byte(1);		//读数据,发送ACK  
+		len--;
+		buf++;  
+	}
+	IIC_Stop();                 //产生一个停止条件
+	return 0;       
+}
+
+//IIC写一个字节 
+//devaddr:器件IIC地址
+//reg:寄存器地址
+//data:数据
+//返回值:0,正常
+//    其他,错误代码
+u8 MPU_Write_Byte(u8 addr,u8 reg,u8 data){
+	IIC_Start();
+	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
+	if(IIC_Wait_Ack()){          //等待应答
+		IIC_Stop();
+		return 1;
+	}
+	IIC_Send_Byte(reg);         //写寄存器地址
+	IIC_Wait_Ack();             //等待应答
+	IIC_Send_Byte(data);        //发送数据
+	if(IIC_Wait_Ack()){          //等待ACK
+		IIC_Stop();
+		return 1;
+	}
+	IIC_Stop();
+	return 0;
+}
+//IIC读一个字节 
+//reg:寄存器地址 
+//返回值:读到的数据
+u8 MPU_Read_Byte(u8 addr,u8 reg){
+	u8 res;
+	IIC_Start();
+	IIC_Send_Byte((addr<<1)|0); //发送器件地址+写命令
+	IIC_Wait_Ack();             //等待应答
+	IIC_Send_Byte(reg);         //写寄存器地址
+	IIC_Wait_Ack();             //等待应答
+	IIC_Start();                
+	IIC_Send_Byte((addr<<1)|1); //发送器件地址+读命令
+	IIC_Wait_Ack();             //等待应答
+	res=IIC_Read_Byte(0);		//读数据,发送nACK  
+	IIC_Stop();                 //产生一个停止条件
+	return res;  
+}

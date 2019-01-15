@@ -97,49 +97,63 @@
 #define MPU_FIFO_RW_REG			  0X74  //FIFO读写寄存器
 #define MPU_DEVICE_ID_REG	    0X75	//器件ID寄存器
 
+
+#define ELLIPSOID_FIT 0 //椭球拟合
+
 typedef struct
 {
 	struct
 	{
-		int16_t ax;     //加速度计
+		int16_t ax;     
 		int16_t ay;
 		int16_t az;
 	 
 		int16_t temp;
 
-		int16_t gx;     //陀螺仪
+		int16_t gx;     
 		int16_t gy;
 		int16_t gz;
 		
-		int16_t mx;
+		int16_t mx;			//unit: mG
 		int16_t my;
 		int16_t mz;
 	}raw;	 //原始数据
 	struct
 	{
-		int16_t ax;     //加速度计
+		int16_t ax;     
 		int16_t ay;
 		int16_t az;
 	 
-		int16_t gx;     //陀螺仪
+		int16_t gx;     
 		int16_t gy;
 		int16_t gz;
 		
-		int16_t mx;
-		int16_t my;
-		int16_t mz;
+		struct{
+			//修正磁强畸变
+			float mx;  //unit: G
+			float my;
+			float mz;
+		  //修正椭球畸变	
+			float b0;
+			float b1;
+			float b2;
+			float b3;
+			float b4;
+			float b5;
+		}mag;
+		
 	}offset;  //偏移	
 	struct
 	{
-		float ax;
+		float ax; //unit: mg
 		float ay;
 		float az;
 		
-		float gx; /*!< omiga, +- 2000dps => +-32768  so gx/16.4 =	deg/s */
+		float gx; /*!< omiga, +- 2000dps => +-32768  so gx/16.4/57.3f =	rad/s */
 		float gy;
 		float gz;
 		
-		float mx;
+		float mx; //unit: G
 		float my;
 		float mz;
 
@@ -153,12 +167,12 @@ typedef struct
 
 extern imu_t imu;
 
-u8 MPU9250_Init(void);
-void IMU_Get_Raw_Data(void);
-void MPU_Get_Temperature(short *temp);
-u8 MPU_Get_Gyroscope(short *gx,short *gy,short *gz);
-u8 MPU_Get_Accelerometer(short *ax,short *ay,short *az);
-u8 MPU_Get_Magnetometer(short *mx,short *my,short *mz);
+u8 imu_init(void);
+void imu_get_raw_data(void);
+void MPU_Get_Temperature(int16_t *temp);
+u8 MPU_Get_Gyroscope(int16_t *gx,int16_t *gy,int16_t *gz);
+u8 MPU_Get_Accelerometer(int16_t *ax,int16_t *ay,int16_t *az);
+u8 MPU_Get_Magnetometer(int16_t *mx,int16_t *my,int16_t *mz);
 
 void Init_Quaternion(void);
 void GetPitchYawGxGyGz(void);
