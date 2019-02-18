@@ -79,9 +79,9 @@ void USART1_IRQHandler(void){
 }
 
 void DMA2_Stream2_IRQHandler(void){
-	if(DMA_GetITStatus(DMA2_Stream2, DMA_IT_TCIF2)){
-	  DMA_ClearFlag(DMA2_Stream2, DMA_FLAG_TCIF2);
-	  DMA_ClearITPendingBit(DMA2_Stream2, DMA_IT_TCIF2);
- 	  RemoteDataProcess(Dbus_rx_buffer);
-	}
+  if(DMA_GetITStatus(DMA2_Stream2, DMA_IT_TCIF2)){
+    DMA_ClearFlag(DMA2_Stream2, DMA_FLAG_TCIF2);
+    DMA_ClearITPendingBit(DMA2_Stream2, DMA_IT_TCIF2);
+    RemoteDataProcess(Dbus_rx_buffer);
+  }
 }

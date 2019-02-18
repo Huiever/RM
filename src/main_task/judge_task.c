@@ -7,10 +7,10 @@
 
 unsigned char judge_buffer[1000];
 unsigned char switch_buffer[20];
-tStudentGameProcessInfo GameProcessInfo;
-tLifeChangedInfo LifeChangedInfo;
-tStudentInterRealShootData RealShootData;
-extPowerHeatData_t PowerHeatData;
+tStudentGameProcessInfo     GameProcessInfo;
+tLifeChangedInfo            LifeChangedInfo;
+tStudentInterRealShootData  RealShootData;
+extPowerHeatData_t          PowerHeatData;
 
 extShowData_t Judge_Send_Data = { 0, 0, 0, 0};
 uint8_t data[13];
@@ -166,15 +166,15 @@ void Append_CRC16_Check_Sum( u8 * pchMessage, u32 dwLength )
 
 void Judge_Init(void)
 {
-    GPIO_InitTypeDef	GPIO_InitStructure;
-    USART_InitTypeDef	USART_InitStructure;
-    NVIC_InitTypeDef	NVIC_InitStructure;
+    GPIO_InitTypeDef    GPIO_InitStructure;
+    USART_InitTypeDef   USART_InitStructure;
+    NVIC_InitTypeDef    NVIC_InitStructure;
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_DMA1, ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-    GPIO_PinAFConfig(GPIOD,GPIO_PinSource6, GPIO_AF_USART2);
-		GPIO_PinAFConfig(GPIOD,GPIO_PinSource5, GPIO_AF_USART2);  
-		USART_DeInit(USART2);
-		// PD6 - RX, PD5 - TX
+    GPIO_PinAFConfig(GPIOD, GPIO_PinSource6, GPIO_AF_USART2);
+    GPIO_PinAFConfig(GPIOD, GPIO_PinSource5, GPIO_AF_USART2);
+    USART_DeInit(USART2);
+    // PD6 - RX, PD5 - TX
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_5;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
@@ -195,10 +195,10 @@ void Judge_Init(void)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
     USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
-		
-		TIM3_Configuration();
-		
-		printf("Judge_Init: Accomplished\r\n");
+
+    TIM3_Configuration();
+
+    //printf("Judge_Init: Accomplished\r\n");
 }
 
 void USART2_IRQHandler(void){
@@ -249,23 +249,23 @@ void DMA1_Stream5_IRQHandler(void){
 	if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_TCIF5)){
 		DMA_ClearFlag(DMA1_Stream5, DMA_FLAG_TCIF5);
 		DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);
-		for ( u8 i = 0; i < 100; i++ ){
+		for (u8 i = 0; i < 100; i++ ){
 			if(judge_buffer[i]==0xA5&&judge_buffer[i+6]==0x00){
 				if(judge_buffer[i+5]==CmdID_3){
-//					printf( "%d\r\n",GameProcessInfo.remainTime);
+//					printf("%d\r\n",GameProcessInfo.remainTime);
 				}
 				if(judge_buffer[i+5]==CmdID_1&&((i+20)<100)){
-					GameProcessInfo.remainTime=judge_buffer[i+7]|judge_buffer[i+8]<<8;
-					GameProcessInfo.CurrentLevel=judge_buffer[i+10];				
-					GameProcessInfo.remainLifeValue=judge_buffer[i+11]|judge_buffer[i+12]<<8;																							
-					GameProcessInfo.MaxLifeValue=judge_buffer[i+13]|judge_buffer[i+14]<<8;
+					GameProcessInfo.remainTime      =judge_buffer[i+7] | judge_buffer[i+8]<<8;
+					GameProcessInfo.CurrentLevel    =judge_buffer[i+10];
+					GameProcessInfo.remainLifeValue =judge_buffer[i+11] | judge_buffer[i+12]<<8;
+					GameProcessInfo.MaxLifeValue    =judge_buffer[i+13] | judge_buffer[i+14]<<8;
 //					printf( "%d\r\n",GameProcessInfo.remainTime);
 //					printf( "%d\r\n",GameProcessInfo.CurrentLevel);
 //					printf( "%d\r\n",GameProcessInfo.remainLifeValue);
 //					printf( "%d\r\n",GameProcessInfo.MaxLifeValue);
 				}
 				else if(judge_buffer[i+5]==CmdID_2&&((i+11)<100)){
-//					LifeChangedInfo.type=judge_buffer[i+7];															
+//					LifeChangedInfo.type=judge_buffer[i+7];
 //					LifeChangedInfo.data=judge_buffer[i+8]|judge_buffer[i+9]<<8;
 				}
 				else if(judge_buffer[i+5]==CmdID_3&&((i+15)<100)){
@@ -305,15 +305,15 @@ void DMA1_Stream5_IRQHandler(void){
 	}
 }
 
-uint16_t JUDGE_GET_Infantry_HeatData( void )
+uint16_t JUDGE_GET_Infantry_HeatData(void)
 {
-	if ( PowerHeatData.shooterHeat17 < 500 )
+	if (PowerHeatData.shooterHeat17 < 500)
 		return PowerHeatData.shooterHeat17;
 	else
 		return 0;
 }
 
-uint8_t JUDGE_GET_Infantry_LevelData( void )
+uint8_t JUDGE_GET_Infantry_LevelData(void)
 {
 	return GameProcessInfo.CurrentLevel;
 }
@@ -327,29 +327,29 @@ uint8_t JUDGE_GET_Infantry_LevelData( void )
 
 void data_pack_handle(uint8_t *p_data, uint16_t len)
 {
-  memset(computer_tx_buf, 0, COMPUTER_FRAME_BUFLEN);
-	uint16_t frame_length = HEADER_LEN + CMD_LEN + len + CRC_LEN;
+    memset(computer_tx_buf, 0, COMPUTER_FRAME_BUFLEN);
+    uint16_t frame_length = HEADER_LEN + CMD_LEN + len + CRC_LEN;
 
-	static uint8_t seq = 0;
-	computer_tx_buf[0] = 0xa5;
-	computer_tx_buf[1] = 0x0D;
-	computer_tx_buf[2] = 0x00;
-	computer_tx_buf[3] = seq++;
-	Append_CRC8_Check_Sum(computer_tx_buf, HEADER_LEN);
+    static uint8_t seq = 0;
+    computer_tx_buf[0] = 0xa5;
+    computer_tx_buf[1] = 0x0D;
+    computer_tx_buf[2] = 0x00;
+    computer_tx_buf[3] = seq++;
+    Append_CRC8_Check_Sum(computer_tx_buf, HEADER_LEN);
 
-	computer_tx_buf[5] = 0x00;
-	computer_tx_buf[6] = 0x01;
+    computer_tx_buf[5] = 0x00;
+    computer_tx_buf[6] = 0x01;
 
-	memcpy(&computer_tx_buf[HEADER_LEN + CMD_LEN], p_data, len);
-	Append_CRC16_Check_Sum(computer_tx_buf, HEADER_LEN + CMD_LEN + len + CRC_LEN);
+    memcpy(&computer_tx_buf[HEADER_LEN + CMD_LEN], p_data, len);
+    Append_CRC16_Check_Sum(computer_tx_buf, HEADER_LEN + CMD_LEN + len + CRC_LEN);
 
-	int t;
-	for(t=0;t<frame_length;t++)
-	{
-//		printf("%d\t",*( (uint8_t *)computer_tx_buf + t ));
-		USART_SendData(USART2, *( computer_tx_buf + t ) );         //向串口2发送数据
-		while(USART_GetFlagStatus(USART2,USART_FLAG_TC)!=SET);//等待发送结束
-	}
+    int t;
+    for(t=0;t<frame_length;t++)
+    {
+        //printf("%d\t",*( (uint8_t *)computer_tx_buf + t ));
+        USART_SendData(USART2, *( computer_tx_buf + t ) );         //向串口2发送数据
+        while(USART_GetFlagStatus(USART2,USART_FLAG_TC)!=SET);//等待发送结束
+    }
 }
 
 void TIM3_Configuration(void){
@@ -378,12 +378,11 @@ void TIM3_Configuration(void){
 	
 }
 
-void TIM3_IRQHandler(void)
-{
+void TIM3_IRQHandler(void){
 	if(TIM_GetITStatus(TIM3,TIM_IT_Update)==SET) //溢出中断
 	{
 		TIM_ClearITPendingBit(TIM3,TIM_IT_Update);
-     TIM_ClearFlag(TIM3, TIM_FLAG_Update);
+        TIM_ClearFlag(TIM3, TIM_FLAG_Update);
 		
 		memcpy(data, (uint8_t*)&Judge_Send_Data, 13);
 		
@@ -391,8 +390,7 @@ void TIM3_IRQHandler(void)
 	}
 }
 
-void Set_Judge_Send_Data( uint8_t i, float Tmp_Data )
-{
+void Set_Judge_Send_Data( uint8_t i, float Tmp_Data ){
 	switch ( i )
 	{
 		case 1:
@@ -418,19 +416,15 @@ void Set_Judge_Send_Data( uint8_t i, float Tmp_Data )
 	return;
 }
 
-void Set_Judge_Send_Flag( uint8_t i, uint8_t Tmp_Flag )
-{
-	if ( i > 5 )
-	{
+void Set_Judge_Send_Flag( uint8_t i, uint8_t Tmp_Flag){
+	if ( i > 5 ){
 		return;
 	}
 	
-	if ( Tmp_Flag == 0 )
-	{
+	if ( Tmp_Flag == 0 ){
 		Judge_Send_Data.mask &= ~( 0x01 << i );
 	}
-	else
-	{
+	else{
 		Judge_Send_Data.mask |= ( 0x01 << i );
 	}
 	return;

@@ -335,9 +335,9 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>STM32F427_437xx,USE_STDPERIPH_DRIVER</Define>
+              <Define>STM32F427_437xx,USE_STDPERIPH_DRIVER,__FPU_USED,__FPU_PRESENT,ARM_MATH_CM4,__CC_ARM,ARM_MATH_MATRIX_CHECK,ARM_MATH_ROUNDING</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\FWLIB\inc;..\include\bsp;..\include\main_task;..\include\system</IncludePath>
+              <IncludePath>..\CORE;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\FWLIB\inc;..\include\bsp;..\include\main_task;..\include\system;..\DSP\Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -516,6 +516,11 @@
               <FileType>4</FileType>
               <FilePath>..\FWLIB\src\RMLib.lib</FilePath>
             </File>
+            <File>
+              <FileName>stm32f4xx_adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\src\stm32f4xx_adc.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -550,6 +555,11 @@
               <FileName>bsp.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\bsp\bsp.c</FilePath>
+            </File>
+            <File>
+              <FileName>adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\bsp\adc.c</FilePath>
             </File>
             <File>
               <FileName>beep.c</FileName>
@@ -615,6 +625,21 @@
               <FileName>imu.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\bsp\imu.c</FilePath>
+            </File>
+            <File>
+              <FileName>power.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\bsp\power.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>DSP</GroupName>
+          <Files>
+            <File>
+              <FileName>arm_cortexM4lf_math.lib</FileName>
+              <FileType>4</FileType>
+              <FilePath>..\DSP\arm_cortexM4lf_math.lib</FilePath>
             </File>
           </Files>
         </Group>

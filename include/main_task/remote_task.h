@@ -39,7 +39,7 @@ typedef __packed struct{
 	uint8_t press_r;
 }Mouse;
 
-typedef	__packed struct{
+typedef __packed struct{
 	uint16_t v;
 }Key;
 

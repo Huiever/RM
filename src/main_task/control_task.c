@@ -6,16 +6,16 @@
 #include "can_bus_task.h"
 #include "imu.h"
 
-PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;     
+PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
 PID_Regulator_t GMPSpeedPID    = GIMBAL_MOTOR_PITCH_SPEED_PID_DEFAULT;
-PID_Regulator_t GMYPositionPID = GIMBAL_MOTOR_YAW_POSITION_PID_DEFAULT;	
+PID_Regulator_t GMYPositionPID = GIMBAL_MOTOR_YAW_POSITION_PID_DEFAULT;
 PID_Regulator_t GMYSpeedPID    = GIMBAL_MOTOR_YAW_SPEED_PID_DEFAULT;
 PID_Regulator_t RAMMERSpeedPID = RAMMER_SPEED_PID_DEFAULT;
 
 WorkState_e lastWorkState = PREPARE_STATE;
 WorkState_e workState     = PREPARE_STATE;
 
-int8_t	 shooting    = 0;
+int8_t   shooting    = 0;
 uint16_t HeatLimit   = 360;
 uint8_t  ShootSpeed  = 25;
 
@@ -27,20 +27,19 @@ static uint32_t time_tick_1ms = 0;
 void Control_Task(void){
 	time_tick_1ms++;
 	WorkStateFSM();
-//	MiniPC_Alive_Count_PlusPlus();
-//	if(Get_MiniPC_Alive_Count() > 3000 && GetWorkState() == SHOOT_STATE){
-//		ResetUpperMonitorCmd();
-//	}
-//	if(GetWorkState() == SHOOT_STATE){
-//		UpperMonitorControlLoop();
-//	}
+	MiniPC_Alive_Count_PlusPlus();
+	if(Get_MiniPC_Alive_Count() > 3000 && GetWorkState() == SHOOT_STATE){
+		ResetUpperMonitorCmd();
+	}
+	if(GetWorkState() == SHOOT_STATE){
+		UpperMonitorControlLoop();
+	}
 	GimbalYawControlModeSwitch();
-//	GMPitchControlLoop();
+	GMPitchControlLoop();
 	GMYawControlLoop();
-//	GMYSpeedPID.output=800;
-//	if(GMYSpeedPID.output>=1200)
-		GMYSpeedPID.output=1200;
+#if Monitor_GM_Encoder==0
 	SetGimbalMotorOutput();
+#endif
 	if(time_tick_1ms % 2 == 0){
 		ShootControlLoop();
 	}

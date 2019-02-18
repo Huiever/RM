@@ -629,8 +629,8 @@ uint8_t CAN_Transmit(CAN_TypeDef* CANx, CanTxMsg* TxMessage)
                                              ((uint32_t)TxMessage->Data[1] << 8) | 
                                              ((uint32_t)TxMessage->Data[0]));
     CANx->sTxMailBox[transmit_mailbox].TDHR = (((uint32_t)TxMessage->Data[7] << 24) | 
-                                             ((uint32_t)TxMessage->Data[6] << 16) |
-                                             ((uint32_t)TxMessage->Data[5] << 8) |
+                                             ((uint32_t)TxMessage->Data[6] << 16) | 
+                                             ((uint32_t)TxMessage->Data[5] << 8) | 
                                              ((uint32_t)TxMessage->Data[4]));
     /* Request transmission */
     CANx->sTxMailBox[transmit_mailbox].TIR |= TMIDxR_TXRQ;

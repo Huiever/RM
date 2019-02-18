@@ -18,6 +18,11 @@
 #include "delay.h"
 #include "usart3.h"
 #include "flags.h"
+#include "power.h"
+#include "adc.h"
+
+//四个24v 输出 依次开启 间隔 709us
+#define POWER_CTRL_ONE_BY_ONE_TIME 709
 
 void BSP_Pre_Init(void){
   NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
@@ -28,10 +33,21 @@ void BSP_Pre_Init(void){
 	
 	delay_ms(100);
 	USART3_Init(115200);
+
+  temperature_ADC_init();
 	
 	TIM2_Init();
 	SPI5_Init();
 	imu_init();
+	
+	//24输出控制口 初始化
+	power_ctrl_configuration();
+
+	//24v 输出 依次上电
+	for (uint8_t i = POWER1_CTRL_SWITCH; i < POWER4_CTRL_SWITCH + 1; i++){
+			power_ctrl_on(i);
+			delay_us(POWER_CTRL_ONE_BY_ONE_TIME);
+	}
 }
 
 void BSP_Init(void)

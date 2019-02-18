@@ -16,7 +16,7 @@ rammer Rammer = { 0, 0, 0 };
 uint16_t Infantry_HeatData    = 0;
 uint8_t  Flag_In_RunAwayState = 0;
 
-void EncoderProcess(volatile Encoder *v, CanRxMsg * msg){
+void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
 	int i = 0;
 	int32_t temp_sum  = 0;    
 	v->last_raw_value = v->raw_value;
@@ -28,7 +28,7 @@ void EncoderProcess(volatile Encoder *v, CanRxMsg * msg){
 	}
 	else if(v->diff > 7500){
 		v->round_cnt--;
-		v->ecd_raw_rate = v->diff- 8192;
+		v->ecd_raw_rate = v->diff - 8192;
 	}		
 	else{
 		v->ecd_raw_rate = v->diff;
@@ -51,7 +51,6 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
 		case CAN_BUS1_Yaw_FEEDBACK_MSG_ID:{
 			if(can_count==1){
 				GMYawEncoder.ecd_bias = yaw_ecd_bias_offset;
-				GMPitchEncoder.ecd_bias = pitch_ecd_bias_offset;
 			}
 			EncoderProcess(&GMYawEncoder ,msg);
 			if(can_count>=90 && can_count<=100){
@@ -65,10 +64,9 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
 		}break;
 		case CAN_BUS1_Pitch_FEEDBACK_MSG_ID:{
 			if(can_count==1){
-				GMYawEncoder.ecd_bias = yaw_ecd_bias_offset;
 				GMPitchEncoder.ecd_bias = pitch_ecd_bias_offset;
 			}
-			EncoderProcess(&GMPitchEncoder ,msg);
+			EncoderProcess(&GMPitchEncoder, msg);
 			if(can_count>=90 && can_count<=100){
 				if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) <-4000){
 					GMPitchEncoder.ecd_bias = pitch_ecd_bias_offset + 8192;
@@ -83,14 +81,26 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
 			Rammer.speed  = msg->Data[2] << 8 | msg->Data[3];
 			Rammer.torque = msg->Data[4] << 8 | msg->Data[5];
 		}break;
-		case ChassisSensor_ID:{	
+		case ChassisSensor_ID:{
 			Infantry_HeatData    = msg->Data[0]<<8 | msg->Data[1];
 			Flag_In_RunAwayState = msg->Data[2];
 		}
 		default:{
 			
 		}break;
-	}
+    }
+
+#if Monitor_GM_Encoder==1
+//  printf("yaw_ecd:%6d  pit_ecd:%6d\r\n",
+//        GMYawEncoder.ecd_value, GMPitchEncoder.ecd_value);
+    printf("yaw_ecd:%6.6f  pit_ecd:%6.6f\r\n",
+            GMYawEncoder.ecd_angle, GMPitchEncoder.ecd_angle);
+#endif
+
+#if Monitor_rammer==1
+    printf("angle:%6d  speed:%6d  torque:%6d\r\n",
+            rammer.angle, rammer.speed, rammer.torque);
+#endif
 }
 
 void Set_Gimbal_Current(CAN_TypeDef *CANx, int16_t gimbal_yaw_iq, int16_t gimbal_pitch_iq){
@@ -99,10 +109,10 @@ void Set_Gimbal_Current(CAN_TypeDef *CANx, int16_t gimbal_yaw_iq, int16_t gimbal
     tx_message.IDE = CAN_Id_Standard;
     tx_message.RTR = CAN_RTR_Data;
     tx_message.DLC = 0x08;
-    tx_message.Data[0] = 0x00;
-    tx_message.Data[1] = 0x00;
-    tx_message.Data[2] = (unsigned char)(gimbal_yaw_iq >> 8);
-    tx_message.Data[3] = (unsigned char)gimbal_yaw_iq;
+    tx_message.Data[0] = (unsigned char)(gimbal_yaw_iq >> 8);
+    tx_message.Data[1] = (unsigned char)gimbal_yaw_iq;
+    tx_message.Data[2] = (unsigned char)(gimbal_pitch_iq >> 8);
+    tx_message.Data[3] = (unsigned char)gimbal_pitch_iq;
     tx_message.Data[4] = 0x00;
     tx_message.Data[5] = 0x00;
     tx_message.Data[6] = 0x00;
@@ -138,7 +148,7 @@ void Set_Rammer_Current(CAN_TypeDef *CANx, int16_t rammer_current ){
 }
 
 void Send_Gimbal_Info(uint8_t Flag_Shoot_State, uint8_t Control_Mode, int16_t ChassisSpeed){
-	CanTxMsg tx_message;
+    CanTxMsg tx_message;
     tx_message.StdId = 0x401;
     tx_message.IDE = CAN_Id_Standard;
     tx_message.RTR = CAN_RTR_Data;

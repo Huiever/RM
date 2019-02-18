@@ -13,7 +13,7 @@ Gimbal_Ref_t       GimbalRef;
 Gimbal_Target_t    Gimbal_Target;
 RampGen_t          FrictionRamp = RAMP_GEN_DAFAULT;
 
-static uint8_t Flag_AutoShoot     = 0;
+static  uint8_t Flag_AutoShoot     = 0;
 int16_t t_inversion        = 0;
 uint8_t Frion_Flag         = 0;
 int16_t MiniPC_Alive_Count = 0;
@@ -23,7 +23,7 @@ int16_t ChassisSpeed_Target = 0;
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 int FRICTION_WHEEL_MAX_DUTY = 1250;
 
-volatile uint8_t upperMonitorOnline   = 0;
+volatile uint8_t upperMonitorOnline = 0;
 static   UpperMonitor_Ctr_t upperMonitorCmd = {0,GIMBAL_CMD_STOP,0,0};
 
 void UpperMonitorDataProcess(uint8_t *pData){
@@ -164,46 +164,46 @@ void GimbalAngleLimit(void){
 }
 
 void RemoteDataProcess(uint8_t *pData){
-	switch(GetWorkState()){
-		case PREPARE_STATE:{
-		
-		}break;
-		default:{
-			if(pData == NULL){
-				return;
-			}
-			RC_CtrlData.rc.ch0  = ((int16_t)pData[0] | ((int16_t)pData[1] << 8)) & 0x07FF; 
-			RC_CtrlData.rc.ch1  = (((int16_t)pData[1] >> 3) | ((int16_t)pData[2] << 5)) & 0x07FF;
-			RC_CtrlData.rc.ch2  = (((int16_t)pData[2] >> 6) | ((int16_t)pData[3] << 2) |
-								  ((int16_t)pData[4] << 10)) & 0x07FF;
-			RC_CtrlData.rc.ch3  = (((int16_t)pData[4] >> 1) | ((int16_t)pData[5]<<7)) & 0x07FF;  
-			RC_CtrlData.rc.s1   = ((pData[5] >> 4) & 0x000C) >> 2;
-			RC_CtrlData.rc.s2   = ((pData[5] >> 4) & 0x0003);
-			RC_CtrlData.mouse.x = ((int16_t)pData[6]) | ((int16_t)pData[7] << 8);
-			RC_CtrlData.mouse.y = ((int16_t)pData[8]) | ((int16_t)pData[9] << 8);
-			RC_CtrlData.mouse.z = ((int16_t)pData[10]) | ((int16_t)pData[11] << 8);    
-			RC_CtrlData.mouse.press_l = pData[12];
-			RC_CtrlData.mouse.press_r = pData[13];
-			RC_CtrlData.key.v   = ((int16_t)pData[14]) | ((int16_t)pData[15] << 8);
-			SetControlMode(&RC_CtrlData.rc);
-			if(GetWorkState() == CONTROL_STATE){
-				ChassisSpeed_Target = (RC_CtrlData.rc.ch1 - 1024) * 10;
-				Gimbal_Target.pitch_angle_target +=  (RC_CtrlData.rc.ch3 - 1024) * 0.004f;
-				Gimbal_Target.yaw_angle_target   +=  (RC_CtrlData.rc.ch2 - 1024) * 0.004f;
-				if( RC_CtrlData.rc.s1 == 1 ){
-					SetFrictionWheelSpeed(1000);
-					Set_Flag_AutoShoot(0);
-				}
-				else if( RC_CtrlData.rc.s1 == 3 ){
-					SetFrictionWheelSpeed(1250);
-					Set_Flag_AutoShoot(0);
-				}
-				else{
-					SetFrictionWheelSpeed(1250);
-					Set_Flag_AutoShoot(1);
-				}
-			}
-			GimbalAngleLimit();
+    switch(GetWorkState()){
+        case PREPARE_STATE:{
+
+        }break;
+        default:{
+            if(pData == NULL){
+                    return;
+            }
+            RC_CtrlData.rc.ch0  = ((int16_t)pData[0] | ((int16_t)pData[1] << 8)) & 0x07FF; 
+            RC_CtrlData.rc.ch1  = (((int16_t)pData[1] >> 3) | ((int16_t)pData[2] << 5)) & 0x07FF;
+            RC_CtrlData.rc.ch2  = (((int16_t)pData[2] >> 6) | ((int16_t)pData[3] << 2) |
+                                  ((int16_t)pData[4] << 10)) & 0x07FF;
+            RC_CtrlData.rc.ch3  = (((int16_t)pData[4] >> 1) | ((int16_t)pData[5]<<7)) & 0x07FF;
+            RC_CtrlData.rc.s1   = ((pData[5] >> 4) & 0x000C) >> 2;
+            RC_CtrlData.rc.s2   = ((pData[5] >> 4) & 0x0003);
+            RC_CtrlData.mouse.x = ((int16_t)pData[6]) | ((int16_t)pData[7] << 8);
+            RC_CtrlData.mouse.y = ((int16_t)pData[8]) | ((int16_t)pData[9] << 8);
+            RC_CtrlData.mouse.z = ((int16_t)pData[10]) | ((int16_t)pData[11] << 8);
+            RC_CtrlData.mouse.press_l = pData[12];
+            RC_CtrlData.mouse.press_r = pData[13];
+            RC_CtrlData.key.v   = ((int16_t)pData[14]) | ((int16_t)pData[15] << 8);
+            SetControlMode(&RC_CtrlData.rc);
+            if(GetWorkState() == CONTROL_STATE){
+            	ChassisSpeed_Target = (RC_CtrlData.rc.ch1 - 1024) * 10;
+            	Gimbal_Target.pitch_angle_target +=  (RC_CtrlData.rc.ch3 - 1024) * 0.004f;
+            	Gimbal_Target.yaw_angle_target   +=  (RC_CtrlData.rc.ch2 - 1024) * 0.004f;
+            	if( RC_CtrlData.rc.s1 == 1 ){
+                    SetFrictionWheelSpeed(1000);
+                    Set_Flag_AutoShoot(0);
+            	}
+            	else if( RC_CtrlData.rc.s1 == 3 ){
+                    SetFrictionWheelSpeed(1250);
+                    Set_Flag_AutoShoot(0);
+            	}
+            	else{
+                    SetFrictionWheelSpeed(1250);
+                    Set_Flag_AutoShoot(1);
+            	}
+            }
+            GimbalAngleLimit();
 		}
 	}
 }
@@ -242,9 +242,9 @@ void Reset_ChassisSpeed_Target(void){
 }
 
 void RemoteTaskInit(void){
-	FrictionRamp.SetScale(&FrictionRamp, FRICTION_RAMP_TICK_COUNT);
+  FrictionRamp.SetScale(&FrictionRamp, FRICTION_RAMP_TICK_COUNT);
   FrictionRamp.ResetCounter(&FrictionRamp);
-	Gimbal_Target.pitch_angle_target = 0.0f;
-	Gimbal_Target.yaw_angle_target   = 0.0f;
-	SetFrictionState(FRICTION_WHEEL_OFF);
+  Gimbal_Target.pitch_angle_target = 0.0f;
+  Gimbal_Target.yaw_angle_target   = 0.0f;
+  SetFrictionState(FRICTION_WHEEL_OFF);
 }
