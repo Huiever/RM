@@ -177,8 +177,8 @@ void Judge_Init(void);
 void USART2_IRQHandler(void);
 void DMA1_Stream5_IRQHandler(void);
 
-uint16_t JUDGE_GET_Infantry_HeatData( void );
-uint8_t JUDGE_GET_Infantry_LevelData( void );
+uint16_t JUDGE_GET_Sentry_HeatData( void );
+uint8_t JUDGE_GET_Sentry_LevelData( void );
 
 /** 
   * @brief  frame header structure definition

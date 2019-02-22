@@ -32,11 +32,11 @@ typedef struct{
     int16_t torque;
 }rammer;
 
-extern rammer Rammer;
+extern volatile rammer Rammer;
 extern volatile Encoder GMYawEncoder;
 extern volatile Encoder GMPitchEncoder;
 
-uint16_t Get_Infantry_HeatData(void);
+uint16_t Get_Sentry_HeatData(void);
 uint8_t  Get_Flag_In_RunAwayState(void);
 void CanReceiveMsgProcess(CanRxMsg *msg);
 void EncoderProcess(volatile Encoder *v, CanRxMsg *msg);

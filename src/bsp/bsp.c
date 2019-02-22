@@ -25,48 +25,48 @@
 #define POWER_CTRL_ONE_BY_ONE_TIME 709
 
 void BSP_Pre_Init(void){
-  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-	
-	KEY_Init();
-	LED_Init(); 
-	BEEP_Init();
-	
-	delay_ms(100);
-	USART3_Init(115200);
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 
-  temperature_ADC_init();
-	
-	TIM2_Init();
-	SPI5_Init();
-	imu_init();
-	
-	//24输出控制口 初始化
-	power_ctrl_configuration();
+    KEY_Init();
+    LED_Init(); 
+    BEEP_Init();
 
-	//24v 输出 依次上电
-	for (uint8_t i = POWER1_CTRL_SWITCH; i < POWER4_CTRL_SWITCH + 1; i++){
-			power_ctrl_on(i);
-			delay_us(POWER_CTRL_ONE_BY_ONE_TIME);
-	}
+    delay_ms(100);
+    USART3_Init(115200);
+
+    temperature_ADC_init();
+
+    TIM2_Init();
+    SPI5_Init();
+    imu_init();
+
+    //24输出控制口 初始化
+    power_ctrl_configuration();
+
+    //24v 输出 依次上电
+    for (uint8_t i = POWER1_CTRL_SWITCH; i < POWER4_CTRL_SWITCH + 1; i++){
+    power_ctrl_on(i);
+    delay_us(POWER_CTRL_ONE_BY_ONE_TIME);
+    }
 }
 
 void BSP_Init(void)
 {
-	ControtTaskInit();
-	RemoteTaskInit();
-	Flags_Init();
-	
-	Gun_Init();
-	Laser_Init();
-	delay_ms(100);
-	Judge_Init();
-	USART6_Init(115200);
-	
-	TIM6_Init();
-	
-	CAN1_Init();
-	CAN2_Init();
-	Dbus_Init();
-	
-	TIM6_Start();
+    ControtTaskInit();
+    RemoteTaskInit();
+    Flags_Init();
+
+    Gun_Init();
+    Laser_Init();
+    delay_ms(100);
+    Judge_Init();
+    USART6_Init(115200);
+
+    TIM6_Init();
+
+    CAN1_Init();
+    CAN2_Init();
+    Dbus_Init();
+
+    TIM6_Start();
 }

@@ -305,7 +305,7 @@ void DMA1_Stream5_IRQHandler(void){
 	}
 }
 
-uint16_t JUDGE_GET_Infantry_HeatData(void)
+uint16_t JUDGE_GET_Sentry_HeatData(void)
 {
 	if (PowerHeatData.shooterHeat17 < 500)
 		return PowerHeatData.shooterHeat17;
@@ -313,7 +313,7 @@ uint16_t JUDGE_GET_Infantry_HeatData(void)
 		return 0;
 }
 
-uint8_t JUDGE_GET_Infantry_LevelData(void)
+uint8_t JUDGE_GET_Sentry_LevelData(void)
 {
 	return GameProcessInfo.CurrentLevel;
 }

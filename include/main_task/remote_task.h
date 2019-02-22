@@ -2,9 +2,16 @@
 #define _REOMTE_TASK_H_
 #include "main.h"
 
-#define PITCH_MAX                   19.0f
-#define YAW_MAX                     210.0f
+#define PITCH_MAX                   45.0f
+#define PITCH_MIN                   -45.0f
+
 #define FRICTION_RAMP_TICK_COUNT	50
+
+#define REMOTE_CONTROLLER_STICK_OFFSET      1024u
+
+#define STICK_TO_CHASSIS_SPEED_REF_FACT     0.45f
+#define STICK_TO_PITCH_ANGLE_INC_FACT       0.004f
+#define STICK_TO_YAW_ANGLE_INC_FACT         0.012f
 
 #define VAL_LIMIT(val, min, max)\
 if(val<=min)\

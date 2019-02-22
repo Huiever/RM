@@ -31,6 +31,8 @@ static volatile float gx, gy, gz, ax, ay, az, mx, my, mz;
 volatile uint32_t     last_update, now_update;               /* Sampling cycle count, ubit ms */
 uint8_t               mpu_buff[14];                          /* buffer to save imu raw data */
 uint8_t               ist_buff[6];                           /* buffer to save IST8310 raw data */
+float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}; // Bias corrections for gyro and accelerometer
+
                                                                                                     
 imu_t                                  imu = {
                                             {0,0,0,0,0,0,0,0,0,0},       //raw
@@ -241,9 +243,9 @@ uint8_t IST8310_Init(void){
   delay_ms(100);
   return 0;
 }
-
+void calibrateMPU6050(float * dest1, float * dest2);
 void imu_init(void){
-    
+    //calibrateMPU6050(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers  
     while(MPU6500_Init()){
         printf("MPU6500 init error！");
     }
@@ -340,6 +342,195 @@ void imu_calibrate(void){
     imu.raw.gz -=  imu.offset.gz;
 }
 
+
+
+// Function which accumulates gyro and accelerometer data after device initialization. It calculates the average
+// of the at-rest readings and then loads the resulting offsets into accelerometer and gyro bias registers.
+void calibrateMPU6050(float * dest1, float * dest2)
+{  
+  uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
+  uint16_t ii, packet_count, fifo_count;
+  int32_t gyro_bias[3] = {0, 0, 0}, accel_bias[3] = {0, 0, 0};
+
+// reset device, reset all registers, clear gyro and accelerometer bias registers
+
+  MPU6500_Write_Reg(PWR_MGMT_1, 0x80); // Write a one to bit 7 reset bit; toggle reset device
+  delay_ms(100);
+   
+// get stable time source
+// Set clock source to be PLL with x-axis gyroscope reference, bits 2:0 = 001
+  MPU6500_Write_Reg(PWR_MGMT_1, 0x01);
+  MPU6500_Write_Reg(PWR_MGMT_2, 0x00);
+  delay_ms(200);
+  
+// Configure device for bias calculation
+
+  MPU6500_Write_Reg(INT_ENABLE, 0x00);
+  MPU6500_Write_Reg(FIFO_EN, 0x00);
+  MPU6500_Write_Reg(PWR_MGMT_1, 0x00);
+  MPU6500_Write_Reg(I2C_MST_CTRL, 0x00);
+  MPU6500_Write_Reg(USER_CTRL, 0x00);
+  MPU6500_Write_Reg(USER_CTRL, 0x0C);
+
+
+//  writeByte(MPU6050_ADDRESS, INT_ENABLE, 0x00);   // Disable all interrupts
+//  writeByte(MPU6050_ADDRESS, FIFO_EN, 0x00);      // Disable FIFO
+//  writeByte(MPU6050_ADDRESS, PWR_MGMT_1, 0x00);   // Turn on internal clock source
+//  writeByte(MPU6050_ADDRESS, I2C_MST_CTRL, 0x00); // Disable I2C master
+//  writeByte(MPU6050_ADDRESS, USER_CTRL, 0x00);    // Disable FIFO and I2C master modes
+//  writeByte(MPU6050_ADDRESS, USER_CTRL, 0x0C);    // Reset FIFO and DMP
+  delay_ms(15);
+  
+// Configure MPU6050 gyro and accelerometer for bias calculation
+  MPU6500_Write_Reg(CONFIG, 0x01);
+  MPU6500_Write_Reg(SMPLRT_DIV, 0x00);
+  MPU6500_Write_Reg(GYRO_CONFIG, 0x00);
+  MPU6500_Write_Reg(ACCEL_CONFIG, 0x00);
+
+
+//  writeByte(MPU6050_ADDRESS, CONFIG, 0x01);      // Set low-pass filter to 188 Hz
+//  writeByte(MPU6050_ADDRESS, SMPLRT_DIV, 0x00);  // Set sample rate to 1 kHz
+//  writeByte(MPU6050_ADDRESS, GYRO_CONFIG, 0x00);  // Set gyro full-scale to 250 degrees per second, maximum sensitivity
+//  writeByte(MPU6050_ADDRESS, ACCEL_CONFIG, 0x00); // Set accelerometer full-scale to 2 g, maximum sensitivity
+// 
+  uint16_t  gyrosensitivity  = 32.8;   // = 131 LSB/degrees/sec
+  uint16_t  accelsensitivity = 16384;  // = 16384 LSB/g
+
+// Configure FIFO to capture accelerometer and gyro data for bias calculation
+
+  MPU6500_Write_Reg(USER_CTRL, 0x40);
+  MPU6500_Write_Reg(FIFO_EN, 0x78);
+
+//  writeByte(MPU6050_ADDRESS, USER_CTRL, 0x40);   // Enable FIFO  
+//  writeByte(MPU6050_ADDRESS, FIFO_EN, 0x78);     // Enable gyro and accelerometer sensors for FIFO  (max size 1024 bytes in MPU-6050)
+  delay_ms(80); // accumulate 80 samples in 80 milliseconds = 960 bytes
+
+// At end of sample accumulation, turn off FIFO sensor read
+
+  MPU6500_Write_Reg(FIFO_EN, 0x00);
+  MPU6500_Read_Regs(FIFO_COUNTH,&data[0],2);
+
+//  writeByte(MPU6050_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
+//  readBytes(MPU6050_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
+  fifo_count = ((uint16_t)data[0] << 8) | data[1];
+  packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
+
+  for (ii = 0; ii < packet_count; ii++) {
+    int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
+    
+    MPU6500_Read_Regs(FIFO_R_W,&data[0],12);
+//    readBytes(MPU6050_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
+    
+    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
+    accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;    
+    gyro_temp[0]  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+    gyro_temp[1]  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+    gyro_temp[2]  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;
+    
+    accel_bias[0] += (int32_t) accel_temp[0]; // Sum individual signed 16-bit biases to get accumulated signed 32-bit biases
+    accel_bias[1] += (int32_t) accel_temp[1];
+    accel_bias[2] += (int32_t) accel_temp[2];
+    gyro_bias[0]  += (int32_t) gyro_temp[0];
+    gyro_bias[1]  += (int32_t) gyro_temp[1];
+    gyro_bias[2]  += (int32_t) gyro_temp[2];
+            
+}
+    accel_bias[0] /= (int32_t) packet_count; // Normalize sums to get average count biases
+    accel_bias[1] /= (int32_t) packet_count;
+    accel_bias[2] /= (int32_t) packet_count;
+    gyro_bias[0]  /= (int32_t) packet_count;
+    gyro_bias[1]  /= (int32_t) packet_count;
+    gyro_bias[2]  /= (int32_t) packet_count;
+    
+  if(accel_bias[2] > 0L) {accel_bias[2] -= (int32_t) accelsensitivity;}  // Remove gravity from the z-axis accelerometer bias calculation
+  else {accel_bias[2] += (int32_t) accelsensitivity;}
+ 
+// Construct the gyro biases for push to the hardware gyro bias registers, which are reset to zero upon device startup
+  data[0] = (-gyro_bias[0]/4  >> 8) & 0xFF; // Divide by 4 to get 32.9 LSB per deg/s to conform to expected bias input format
+  data[1] = (-gyro_bias[0]/4)       & 0xFF; // Biases are additive, so change sign on calculated average gyro biases
+  data[2] = (-gyro_bias[1]/4  >> 8) & 0xFF;
+  data[3] = (-gyro_bias[1]/4)       & 0xFF;
+  data[4] = (-gyro_bias[2]/4  >> 8) & 0xFF;
+  data[5] = (-gyro_bias[2]/4)       & 0xFF;
+
+// Push gyro biases to hardware registers
+
+
+//  MPU6500_Write_Reg(INT_ENABLE, 0x00);
+//  MPU6500_Write_Reg(FIFO_EN, 0x00);
+//  MPU6500_Write_Reg(PWR_MGMT_1, 0x00);
+//  MPU6500_Write_Reg(I2C_MST_CTRL, 0x00);
+//  MPU6500_Write_Reg(USER_CTRL, 0x00);
+//  MPU6500_Write_Reg(USER_CTRL, 0x00);
+
+
+  MPU6500_Write_Reg( XG_OFFS_USRH, data[0]); 
+  MPU6500_Write_Reg( XG_OFFS_USRL, data[1]);
+  MPU6500_Write_Reg( YG_OFFS_USRH, data[2]);
+  MPU6500_Write_Reg( YG_OFFS_USRL, data[3]);
+  MPU6500_Write_Reg( ZG_OFFS_USRH, data[4]);
+  MPU6500_Write_Reg( ZG_OFFS_USRL, data[5]);
+
+  dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity; // construct gyro bias in deg/s for later manual subtraction
+  dest1[1] = (float) gyro_bias[1]/(float) gyrosensitivity;
+  dest1[2] = (float) gyro_bias[2]/(float) gyrosensitivity;
+
+// Construct the accelerometer biases for push to the hardware accelerometer bias registers. These registers contain
+// factory trim values which must be added to the calculated accelerometer biases; on boot up these registers will hold
+// non-zero values. In addition, bit 0 of the lower byte must be preserved since it is used for temperature
+// compensation calculations. Accelerometer bias registers expect bias input as 2048 LSB per g, so that
+// the accelerometer biases calculated above must be divided by 8.
+
+  int32_t accel_bias_reg[3] = {0, 0, 0}; // A place to hold the factory accelerometer trim biases
+  MPU6500_Read_Regs(XA_OFFSET_H,&data[0],2);
+//  readBytes(MPU6050_ADDRESS, XA_OFFSET_H, 2, &data[0]); // Read factory accelerometer trim values
+  accel_bias_reg[0] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+
+  MPU6500_Read_Regs(YA_OFFSET_H,&data[0],2);
+//  readBytes(MPU6050_ADDRESS, YA_OFFSET_H, 2, &data[0]);
+  accel_bias_reg[1] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+
+  MPU6500_Read_Regs(ZA_OFFSET_H,&data[0],2);
+//  readBytes(MPU6050_ADDRESS, ZA_OFFSET_H, 2, &data[0]);
+  accel_bias_reg[2] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+  
+  uint32_t mask = 1uL; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
+  uint8_t mask_bit[3] = {0, 0, 0}; // Define array to hold mask bit for each accelerometer bias axis
+  
+  for(ii = 0; ii < 3; ii++) {
+    if(accel_bias_reg[ii] & mask) mask_bit[ii] = 0x01; // If temperature compensation bit is set, record that fact in mask_bit
+  }
+
+  // Construct total accelerometer bias, including calculated average accelerometer bias from above
+  accel_bias_reg[0] -= (accel_bias[0]/8); // Subtract calculated averaged accelerometer bias scaled to 2048 LSB/g (16 g full scale)
+  accel_bias_reg[1] -= (accel_bias[1]/8);
+  accel_bias_reg[2] -= (accel_bias[2]/8);
+ 
+  data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
+  data[1] = (accel_bias_reg[0])      & 0xFF;
+  data[1] = data[1] | mask_bit[0]; // preserve temperature compensation bit when writing back to accelerometer bias registers
+  data[2] = (accel_bias_reg[1] >> 8) & 0xFF;
+  data[3] = (accel_bias_reg[1])      & 0xFF;
+  data[3] = data[3] | mask_bit[1]; // preserve temperature compensation bit when writing back to accelerometer bias registers
+  data[4] = (accel_bias_reg[2] >> 8) & 0xFF;
+  data[5] = (accel_bias_reg[2])      & 0xFF;
+  data[5] = data[5] | mask_bit[2]; // preserve temperature compensation bit when writing back to accelerometer bias registers
+
+  // Push accelerometer biases to hardware registers
+//  writeByte(MPU6050_ADDRESS, XA_OFFSET_H, data[0]);  
+//  writeByte(MPU6050_ADDRESS, XA_OFFSET_L_TC, data[1]);
+//  writeByte(MPU6050_ADDRESS, YA_OFFSET_H, data[2]);
+//  writeByte(MPU6050_ADDRESS, YA_OFFSET_L_TC, data[3]);  
+//  writeByte(MPU6050_ADDRESS, ZA_OFFSET_H, data[4]);
+//  writeByte(MPU6050_ADDRESS, ZA_OFFSET_L_TC, data[5]);
+
+// Output scaled accelerometer biases for manual subtraction in the main program
+   dest2[0] = (float)accel_bias[0]/(float)accelsensitivity; 
+   dest2[1] = (float)accel_bias[1]/(float)accelsensitivity;
+   dest2[2] = (float)accel_bias[2]/(float)accelsensitivity;
+}
+
 //Get 6 axis data from MPU6500
 void IMU_Get_Raw_Data(void)
 {
@@ -375,14 +566,26 @@ void IMU_Get_Raw_Data(void)
 
     imu_calibrate();
 
+//    imu.raw.ax -=  accelBias[0];
+//    imu.raw.ay -=  accelBias[1];
+//    imu.raw.az -=  accelBias[2];
+
+//    imu.raw.gx -=  gyroBias[0];
+//    imu.raw.gy -=  gyroBias[1];
+//    imu.raw.gz -=  gyroBias[2];
+
 //    imu.rip.temp = 21 + imu.raw.temp / 333.87f;
 
     imu.rip.temp = imu.raw.temp * MPU6500_TEMPERATURE_FACTOR + MPU6500_TEMPERATURE_OFFSET;
 
 //unit:m/s2
-    imu.rip.ax = (float)(imu.raw.ax * 9.8 /16384);
-    imu.rip.ay = (float)(imu.raw.ay * 9.8 /16384);
-    imu.rip.az = (float)(imu.raw.az * 9.8 /16384);
+//    imu.rip.ax = (float)(imu.raw.ax * 9.8 / 16384);
+//    imu.rip.ay = (float)(imu.raw.ay * 9.8 / 16384);
+//    imu.rip.az = (float)(imu.raw.az * 9.8 / 16384);
+
+    imu.rip.ax = (float)(imu.raw.ax / 16384);
+    imu.rip.ay = (float)(imu.raw.ay / 16384);
+    imu.rip.az = (float)(imu.raw.az / 16384);
 
     static uint8_t updata_count=0;
     //加速度计低通滤波
@@ -739,7 +942,7 @@ void IMU_AHRSupdate(void){
 //---------------------------------------------------------------------------------------------------
 // Definitions
 
-#define sampleFreq    200.0f            // sample frequency in Hz
+#define sampleFreq    100.0f            // sample frequency in Hz
 #define twoKpDef    (100.0f * 0.5f)    // 2 * proportional gain
 #define twoKiDef    0    // 2 * integral gain
 
@@ -750,109 +953,6 @@ volatile float twoKp = twoKpDef;                                            // 2
 volatile float twoKi = twoKiDef;                                            // 2 * integral gain (Ki)
 //volatile float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;                    // quaternion of sensor frame relative to auxiliary frame
 volatile float integralFBx = 0.0f,  integralFBy = 0.0f, integralFBz = 0.0f;    // integral error terms scaled by Ki
-//---------------------------------------------------------------------------------------------------
-// AHRS algorithm update
-
-void MahonyAHRSupdate(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz) {
-    float recipNorm;
-    float q0q0, q0q1, q0q2, q0q3, q1q1, q1q2, q1q3, q2q2, q2q3, q3q3;
-    float hx, hy, bx, bz;
-    float halfvx, halfvy, halfvz, halfwx, halfwy, halfwz;
-    float halfex, halfey, halfez;
-    float qa, qb, qc;
-    
-#if AXIS_6
-    // Use IMU algorithm if magnetometer measurement invalid (avoids NaN in magnetometer normalisation)
-        MahonyAHRSupdateIMU(gx, gy, gz, ax, ay, az);
-        return;
-#endif
-    // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-    if(!((ax  ==  0.0f) && (ay  ==  0.0f) && (az  ==  0.0f))) {
-
-        // Normalise accelerometer measurement
-        recipNorm = invSqrt(ax * ax + ay * ay + az * az);
-        ax *=  recipNorm;
-        ay *=  recipNorm;
-        az *=  recipNorm;
-
-        // Normalise magnetometer measurement
-        recipNorm = invSqrt(mx * mx + my * my + mz * mz);
-        mx *=  recipNorm;
-        my *=  recipNorm;
-        mz *=  recipNorm;   
-
-        // Auxiliary variables to avoid repeated arithmetic
-        q0q0 = q0 * q0;
-        q0q1 = q0 * q1;
-        q0q2 = q0 * q2;
-        q0q3 = q0 * q3;
-        q1q1 = q1 * q1;
-        q1q2 = q1 * q2;
-        q1q3 = q1 * q3;
-        q2q2 = q2 * q2;
-        q2q3 = q2 * q3;
-        q3q3 = q3 * q3;   
-
-        // Reference direction of Earth's magnetic field
-        hx = 2.0f * (mx * (0.5f - q2q2 - q3q3) + my * (q1q2 - q0q3) + mz * (q1q3 + q0q2));
-        hy = 2.0f * (mx * (q1q2 + q0q3) + my * (0.5f - q1q1 - q3q3) + mz * (q2q3 - q0q1));
-        bx = sqrt(hx * hx + hy * hy);
-        bz = 2.0f * (mx * (q1q3 - q0q2) + my * (q2q3 + q0q1) + mz * (0.5f - q1q1 - q2q2));
-
-        // Estimated direction of gravity and magnetic field
-        halfvx = q1q3 - q0q2;
-        halfvy = q0q1 + q2q3;
-        halfvz = q0q0 - 0.5f + q3q3;
-        halfwx = bx * (0.5f - q2q2 - q3q3) + bz * (q1q3 - q0q2);
-        halfwy = bx * (q1q2 - q0q3) + bz * (q0q1 + q2q3);
-        halfwz = bx * (q0q2 + q1q3) + bz * (0.5f - q1q1 - q2q2);  
-    
-        // Error is sum of cross product between estimated direction and measured direction of field vectors
-        halfex = (ay * halfvz - az * halfvy) + (my * halfwz - mz * halfwy);
-        halfey = (az * halfvx - ax * halfvz) + (mz * halfwx - mx * halfwz);
-        halfez = (ax * halfvy - ay * halfvx) + (mx * halfwy - my * halfwx);
-
-        // Compute and apply integral feedback if enabled
-        if(twoKi > 0.0f) {
-            integralFBx +=  twoKi * halfex * (1.0f / sampleFreq);    // integral error scaled by Ki
-            integralFBy +=  twoKi * halfey * (1.0f / sampleFreq);
-            integralFBz +=  twoKi * halfez * (1.0f / sampleFreq);
-
-            gx +=  integralFBx;    // apply integral feedback
-            gy +=  integralFBy;
-            gz +=  integralFBz;
-        }
-        else {
-            integralFBx = 0.0f;    // prevent integral windup
-            integralFBy = 0.0f;
-            integralFBz = 0.0f;
-        }
-
-        // Apply proportional feedback
-        gx +=  twoKp * halfex;
-        gy +=  twoKp * halfey;
-        gz +=  twoKp * halfez;
-    }
-    
-    // Integrate rate of change of quaternion
-    gx *=  (0.5f * (1.0f / sampleFreq));        // pre-multiply common factors
-    gy *=  (0.5f * (1.0f / sampleFreq));
-    gz *=  (0.5f * (1.0f / sampleFreq));
-    qa = q0;
-    qb = q1;
-    qc = q2;
-    q0 +=  (-qb * gx - qc * gy - q3 * gz);
-    q1 +=  (qa * gx + qc * gz - q3 * gy);
-    q2 +=  (qa * gy - qb * gz + q3 * gx);
-    q3 +=  (qa * gz + qb * gy - qc * gx); 
-    
-    // Normalise quaternion
-    recipNorm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-    q0 *=  recipNorm;
-    q1 *=  recipNorm;
-    q2 *=  recipNorm;
-    q3 *=  recipNorm;
-}
 
 //---------------------------------------------------------------------------------------------------
 // IMU algorithm update
@@ -931,196 +1031,118 @@ void MahonyAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, float
 // END OF CODE
 // =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  = 
 
-//---------------------------------------------------------------------------------------------------
-// Definitions
+// parameters for 6 DoF sensor fusion calculations
+#define PI = 3.14159265358979323846f;
+#define GyroMeasError = 1.04719755119;     // gyroscope measurement error in rads/s (start at 60 deg/s), then reduce after ~10 s to 3
+volatile float beta = 0.9068996821;  // compute beta
+#define GyroMeasDrift = PI * (1.0f / 180.0f);      // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
+volatile float zeta = 0.0151149947;  // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
+volatile float deltat = 0.0f;                              // integration interval for both filter schemes
+volatile int lastUpdate = 0, firstUpdate = 0, Now = 0;     // used to calculate integration interval                               // used to calculate integration interval
 
-//#define sampleFreq	512.0f		// sample frequency in Hz
-#define betaDef		5.0f		// 2 * proportional gain
+// Implementation of Sebastian Madgwick's "...efficient orientation filter for... inertial/magnetic sensor arrays"
+// (see http://www.x-io.co.uk/category/open-source/ for examples and more details)
+// which fuses acceleration and rotation rate to produce a quaternion-based estimate of relative
+// device orientation -- which can be converted to yaw, pitch, and roll. Useful for stabilizing quadcopters, etc.
+// The performance of the orientation filter is at least as good as conventional Kalman-based filtering algorithms
+// but is much less computationally intensive---it can be performed on a 3.3 V Pro Mini operating at 8 MHz!
+void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz)
+{
+    float norm;                                               // vector norm
+    float f1, f2, f3;                                         // objective funcyion elements
+    float J_11or24, J_12or23, J_13or22, J_14or21, J_32, J_33; // objective function Jacobian elements
+    float qDot1, qDot2, qDot3, qDot4;
+    float hatDot1, hatDot2, hatDot3, hatDot4;
+    float gerrx, gerry, gerrz, gbiasx, gbiasy, gbiasz;  // gyro bias error
 
-//---------------------------------------------------------------------------------------------------
-// Variable definitions
+    // Auxiliary variables to avoid repeated arithmetic
+    float _halfq1 = 0.5f * q0;
+    float _halfq2 = 0.5f * q1;
+    float _halfq3 = 0.5f * q2;
+    float _halfq4 = 0.5f * q3;
+    float _2q1 = 2.0f * q0;
+    float _2q2 = 2.0f * q1;
+    float _2q3 = 2.0f * q2;
+    float _2q4 = 2.0f * q3;
+//            float _2q1q3 = 2.0f * q0 * q2;
+//            float _2q3q4 = 2.0f * q2 * q3;
 
-volatile float beta = betaDef;								// 2 * proportional gain (Kp)
-//volatile float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;	// quaternion of sensor frame relative to auxiliary frame
+    Now = Get_Time_Micros(); //ms
+    deltat = (float)((Now - lastUpdate)/1000.0f) ; // set integration time by time elapsed since last filter update
+    lastUpdate = Now;
 
-//---------------------------------------------------------------------------------------------------
-// Function declarations
+    if(lastUpdate - firstUpdate > 10000.0f) {
+     beta = 0.04;  // decrease filter gain after stabilized
+     zeta = 0.015; // increasey bias drift gain after stabilized
+    }
 
-//float invSqrt(float x);
 
-//====================================================================================================
-// Functions
+    // Normalise accelerometer measurement
+    norm = sqrt(ax * ax + ay * ay + az * az);
+    if (norm == 0.0f) return; // handle NaN
+    norm = 1.0f/norm;
+    ax *= norm;
+    ay *= norm;
+    az *= norm;
+    
+    // Compute the objective function and Jacobian
+    f1 = _2q2 * q3 - _2q1 * q2 - ax;
+    f2 = _2q1 * q1 + _2q3 * q3 - ay;
+    f3 = 1.0f - _2q2 * q1 - _2q3 * q2 - az;
+    J_11or24 = _2q3;
+    J_12or23 = _2q4;
+    J_13or22 = _2q1;
+    J_14or21 = _2q2;
+    J_32 = 2.0f * J_14or21;
+    J_33 = 2.0f * J_11or24;
+  
+    // Compute the gradient (matrix multiplication)
+    hatDot1 = J_14or21 * f2 - J_11or24 * f1;
+    hatDot2 = J_12or23 * f1 + J_13or22 * f2 - J_32 * f3;
+    hatDot3 = J_12or23 * f2 - J_33 *f3 - J_13or22 * f1;
+    hatDot4 = J_14or21 * f1 + J_11or24 * f2;
+    
+    // Normalize the gradient
+    norm = sqrt(hatDot1 * hatDot1 + hatDot2 * hatDot2 + hatDot3 * hatDot3 + hatDot4 * hatDot4);
+    hatDot1 /= norm;
+    hatDot2 /= norm;
+    hatDot3 /= norm;
+    hatDot4 /= norm;
+    
+    // Compute estimated gyroscope biases
+    gerrx = _2q1 * hatDot2 - _2q2 * hatDot1 - _2q3 * hatDot4 + _2q4 * hatDot3;
+    gerry = _2q1 * hatDot3 + _2q2 * hatDot4 - _2q3 * hatDot1 - _2q4 * hatDot2;
+    gerrz = _2q1 * hatDot4 - _2q2 * hatDot3 + _2q3 * hatDot2 - _2q4 * hatDot1;
+    
+    // Compute and remove gyroscope biases
+    gbiasx += gerrx * deltat * zeta;
+    gbiasy += gerry * deltat * zeta;
+    gbiasz += gerrz * deltat * zeta;
+//           gx -= gbiasx;
+//           gy -= gbiasy;
+//           gz -= gbiasz;
+    
+    // Compute the quaternion derivative
+    qDot1 = -_halfq2 * gx - _halfq3 * gy - _halfq4 * gz;
+    qDot2 =  _halfq1 * gx + _halfq3 * gz - _halfq4 * gy;
+    qDot3 =  _halfq1 * gy - _halfq2 * gz + _halfq4 * gx;
+    qDot4 =  _halfq1 * gz + _halfq2 * gy - _halfq3 * gx;
 
-//---------------------------------------------------------------------------------------------------
-// AHRS algorithm update
+    // Compute then integrate estimated quaternion derivative
+    q0 += (qDot1 -(beta * hatDot1)) * deltat;
+    q1 += (qDot2 -(beta * hatDot2)) * deltat;
+    q2 += (qDot3 -(beta * hatDot3)) * deltat;
+    q3 += (qDot4 -(beta * hatDot4)) * deltat;
 
-void MadgwickAHRSupdate(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz) {
-	float recipNorm;
-	float s0, s1, s2, s3;
-	float qDot1, qDot2, qDot3, qDot4;
-	float hx, hy;
-	float _2q0mx, _2q0my, _2q0mz, _2q1mx, _2bx, _2bz, _4bx, _4bz, _2q0, _2q1, _2q2, _2q3, _2q0q2, _2q2q3, q0q0, q0q1, q0q2, q0q3, q1q1, q1q2, q1q3, q2q2, q2q3, q3q3;
-
-	// Use IMU algorithm if magnetometer measurement invalid (avoids NaN in magnetometer normalisation)
-	if((mx == 0.0f) && (my == 0.0f) && (mz == 0.0f)) {
-		MadgwickAHRSupdateIMU(gx, gy, gz, ax, ay, az);
-		return;
-	}
-
-	// Rate of change of quaternion from gyroscope
-	qDot1 = 0.5f * (-q1 * gx - q2 * gy - q3 * gz);
-	qDot2 = 0.5f * (q0 * gx + q2 * gz - q3 * gy);
-	qDot3 = 0.5f * (q0 * gy - q1 * gz + q3 * gx);
-	qDot4 = 0.5f * (q0 * gz + q1 * gy - q2 * gx);
-
-	// Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-	if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
-
-		// Normalise accelerometer measurement
-		recipNorm = invSqrt(ax * ax + ay * ay + az * az);
-		ax *= recipNorm;
-		ay *= recipNorm;
-		az *= recipNorm;   
-
-		// Normalise magnetometer measurement
-		recipNorm = invSqrt(mx * mx + my * my + mz * mz);
-		mx *= recipNorm;
-		my *= recipNorm;
-		mz *= recipNorm;
-
-		// Auxiliary variables to avoid repeated arithmetic
-		_2q0mx = 2.0f * q0 * mx;
-		_2q0my = 2.0f * q0 * my;
-		_2q0mz = 2.0f * q0 * mz;
-		_2q1mx = 2.0f * q1 * mx;
-		_2q0 = 2.0f * q0;
-		_2q1 = 2.0f * q1;
-		_2q2 = 2.0f * q2;
-		_2q3 = 2.0f * q3;
-		_2q0q2 = 2.0f * q0 * q2;
-		_2q2q3 = 2.0f * q2 * q3;
-		q0q0 = q0 * q0;
-		q0q1 = q0 * q1;
-		q0q2 = q0 * q2;
-		q0q3 = q0 * q3;
-		q1q1 = q1 * q1;
-		q1q2 = q1 * q2;
-		q1q3 = q1 * q3;
-		q2q2 = q2 * q2;
-		q2q3 = q2 * q3;
-		q3q3 = q3 * q3;
-
-		// Reference direction of Earth's magnetic field
-		hx = mx * q0q0 - _2q0my * q3 + _2q0mz * q2 + mx * q1q1 + _2q1 * my * q2 + _2q1 * mz * q3 - mx * q2q2 - mx * q3q3;
-		hy = _2q0mx * q3 + my * q0q0 - _2q0mz * q1 + _2q1mx * q2 - my * q1q1 + my * q2q2 + _2q2 * mz * q3 - my * q3q3;
-		_2bx = sqrt(hx * hx + hy * hy);
-		_2bz = -_2q0mx * q2 + _2q0my * q1 + mz * q0q0 + _2q1mx * q3 - mz * q1q1 + _2q2 * my * q3 - mz * q2q2 + mz * q3q3;
-		_4bx = 2.0f * _2bx;
-		_4bz = 2.0f * _2bz;
-
-		// Gradient decent algorithm corrective step
-		s0 = -_2q2 * (2.0f * q1q3 - _2q0q2 - ax) + _2q1 * (2.0f * q0q1 + _2q2q3 - ay) - _2bz * q2 * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (-_2bx * q3 + _2bz * q1) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + _2bx * q2 * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
-		s1 = _2q3 * (2.0f * q1q3 - _2q0q2 - ax) + _2q0 * (2.0f * q0q1 + _2q2q3 - ay) - 4.0f * q1 * (1 - 2.0f * q1q1 - 2.0f * q2q2 - az) + _2bz * q3 * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (_2bx * q2 + _2bz * q0) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + (_2bx * q3 - _4bz * q1) * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
-		s2 = -_2q0 * (2.0f * q1q3 - _2q0q2 - ax) + _2q3 * (2.0f * q0q1 + _2q2q3 - ay) - 4.0f * q2 * (1 - 2.0f * q1q1 - 2.0f * q2q2 - az) + (-_4bx * q2 - _2bz * q0) * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (_2bx * q1 + _2bz * q3) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + (_2bx * q0 - _4bz * q2) * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
-		s3 = _2q1 * (2.0f * q1q3 - _2q0q2 - ax) + _2q2 * (2.0f * q0q1 + _2q2q3 - ay) + (-_4bx * q3 + _2bz * q1) * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (-_2bx * q0 + _2bz * q2) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + _2bx * q1 * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
-		recipNorm = invSqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3); // normalise step magnitude
-		s0 *= recipNorm;
-		s1 *= recipNorm;
-		s2 *= recipNorm;
-		s3 *= recipNorm;
-
-		// Apply feedback step
-		qDot1 -= beta * s0;
-		qDot2 -= beta * s1;
-		qDot3 -= beta * s2;
-		qDot4 -= beta * s3;
-	}
-
-	// Integrate rate of change of quaternion to yield quaternion
-	q0 += qDot1 * (1.0f / sampleFreq);
-	q1 += qDot2 * (1.0f / sampleFreq);
-	q2 += qDot3 * (1.0f / sampleFreq);
-	q3 += qDot4 * (1.0f / sampleFreq);
-
-	// Normalise quaternion
-	recipNorm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-	q0 *= recipNorm;
-	q1 *= recipNorm;
-	q2 *= recipNorm;
-	q3 *= recipNorm;
+    // Normalize the quaternion
+    norm = sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);    // normalise quaternion
+    norm = 1.0f/norm;
+    q0 = q0 * norm;
+    q1 = q1 * norm;
+    q2 = q2 * norm;
+    q3 = q3 * norm;
+    
 }
-
-//---------------------------------------------------------------------------------------------------
-// IMU algorithm update
-
-void MadgwickAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, float az) {
-	float recipNorm;
-	float s0, s1, s2, s3;
-	float qDot1, qDot2, qDot3, qDot4;
-	float _2q0, _2q1, _2q2, _2q3, _4q0, _4q1, _4q2 ,_8q1, _8q2, q0q0, q1q1, q2q2, q3q3;
-
-	// Rate of change of quaternion from gyroscope
-	qDot1 = 0.5f * (-q1 * gx - q2 * gy - q3 * gz);
-	qDot2 = 0.5f * (q0 * gx + q2 * gz - q3 * gy);
-	qDot3 = 0.5f * (q0 * gy - q1 * gz + q3 * gx);
-	qDot4 = 0.5f * (q0 * gz + q1 * gy - q2 * gx);
-
-	// Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-	if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
-
-		// Normalise accelerometer measurement
-		recipNorm = invSqrt(ax * ax + ay * ay + az * az);
-		ax *= recipNorm;
-		ay *= recipNorm;
-		az *= recipNorm;   
-
-		// Auxiliary variables to avoid repeated arithmetic
-		_2q0 = 2.0f * q0;
-		_2q1 = 2.0f * q1;
-		_2q2 = 2.0f * q2;
-		_2q3 = 2.0f * q3;
-		_4q0 = 4.0f * q0;
-		_4q1 = 4.0f * q1;
-		_4q2 = 4.0f * q2;
-		_8q1 = 8.0f * q1;
-		_8q2 = 8.0f * q2;
-		q0q0 = q0 * q0;
-		q1q1 = q1 * q1;
-		q2q2 = q2 * q2;
-		q3q3 = q3 * q3;
-
-		// Gradient decent algorithm corrective step
-		s0 = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
-		s1 = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * q1 - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
-		s2 = 4.0f * q0q0 * q2 + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
-		s3 = 4.0f * q1q1 * q3 - _2q1 * ax + 4.0f * q2q2 * q3 - _2q2 * ay;
-		recipNorm = invSqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3); // normalise step magnitude
-		s0 *= recipNorm;
-		s1 *= recipNorm;
-		s2 *= recipNorm;
-		s3 *= recipNorm;
-
-		// Apply feedback step
-		qDot1 -= beta * s0;
-		qDot2 -= beta * s1;
-		qDot3 -= beta * s2;
-		qDot4 -= beta * s3;
-	}
-
-	// Integrate rate of change of quaternion to yield quaternion
-	q0 += qDot1 * (1.0f / sampleFreq);
-	q1 += qDot2 * (1.0f / sampleFreq);
-	q2 += qDot3 * (1.0f / sampleFreq);
-	q3 += qDot4 * (1.0f / sampleFreq);
-
-	// Normalise quaternion
-	recipNorm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-	q0 *= recipNorm;
-	q1 *= recipNorm;
-	q2 *= recipNorm;
-	q3 *= recipNorm;
-}
-
 
 
 /**
@@ -1245,13 +1267,13 @@ int16_t get_mpu_gz(void){
 
 void imu_main(void){
     IMU_Get_Raw_Data();
-    //IMU_AHRSupdate();
-    //MadgwickAHRSupdate(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az,imu.rip.mx,imu.rip.my,imu.rip.mz);
-    MahonyAHRSupdateIMU(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az);
+    IMU_AHRSupdate();
+    //MahonyAHRSupdateIMU(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az);
+    //MadgwickQuaternionUpdate(imu.rip.ax,imu.rip.ay,imu.rip.az, imu.rip.gx,imu.rip.gy,imu.rip.gz);
     IMU_getYawPitchRoll();
     delay_ms(5);
     IMU_getYawPitchRoll();
-	  IMU_GET_CONTROL_TEMPERATURE();
+    IMU_GET_CONTROL_TEMPERATURE();
     delay_ms(5);
 #if Monitor_IMU_Angle == 1
     printf("yaw_angle:%8.3lf   pit_angle:%8.3lf  rol_angle:%8.3lf\r\n", imu.rip.yaw, imu.rip.pit, imu.rip.rol);
