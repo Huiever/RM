@@ -42,47 +42,60 @@ void UpperMonitorDataProcess(uint8_t *pData){
     int16_t d2 = *((int16_t *)(pData + 3));
     if(upperMonitorOnline){
         switch (pData[0]){
-        case GIMBAL_MOVETO:{
-            upperMonitorCmd.d1 = d1 * 0.01f;
-            upperMonitorCmd.d2 = d2 * 0.01f;
-            upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVETO;
-        }break;
-        case GIMBAL_MOVEBY:{
-            upperMonitorCmd.d1 = d1 * 0.001f;
-            upperMonitorCmd.d2 = d2 * 0.001f;
-            upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVEBY;
-        }break;
-        case GIMBAL_TURN_BACK:{
-            upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_STOP;
-        }break;
-        case START_FRICTION:{
-            upperMonitorCmd.startFriction = 1;
-            SetFrictionWheelSpeed(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp.Calc(&FrictionRamp)); 
-            if(FrictionRamp.IsOverflow(&FrictionRamp)){
-                RequestFinishFrictionSpeedUp();
-            }
-        }break;
-        case STOP_FRICTION:{
-            upperMonitorCmd.startFriction = 0;
-            SetFrictionWheelSpeed(1000);
-            FrictionRamp.ResetCounter(&FrictionRamp);
-        }break;
-        case START_SHOOTING:{
-            Set_Flag_AutoShoot(1);
-        }break;
-        case STOP_SHOOTING:{
-            Set_Flag_AutoShoot(0);
-        }break;
-        case REQUEST_CURR_STATE:{
+            case GIMBAL_MOVETO:{
+                upperMonitorCmd.d1 = d1 * 0.01f;
+                upperMonitorCmd.d2 = d2 * 0.01f;
+                upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVETO;
+            }break;
             
-        }break;
-        case EXIT_UPPER_MONITOR_CTR:{
-            SetUpperMonitorOnline(0);
-        }break;
-        default:{
+            case GIMBAL_MOVEBY:{
+                upperMonitorCmd.d1 = d1 * 0.001f;
+                upperMonitorCmd.d2 = d2 * 0.001f;
+                upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVEBY;
+            }break;
             
-        }break;
-            }
+            case GIMBAL_TURN_BACK:{
+                upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_STOP;
+            }break;
+            
+            case START_FRICTION:{
+                upperMonitorCmd.startFriction = 1;
+                SetFrictionWheelSpeed(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp.Calc(&FrictionRamp)); 
+                if(FrictionRamp.IsOverflow(&FrictionRamp)){
+                    RequestFinishFrictionSpeedUp();
+                }
+            }break;
+                
+            case STOP_FRICTION:{
+                upperMonitorCmd.startFriction = 0;
+                SetFrictionWheelSpeed(1000);
+                FrictionRamp.ResetCounter(&FrictionRamp);
+            }break;
+            
+            case START_SHOOTING:{
+                Set_Flag_AutoShoot(1);
+            }break;
+            
+            case STOP_SHOOTING:{
+                Set_Flag_AutoShoot(0);
+            }break;
+            
+            case REQUEST_CURR_STATE:{
+                
+            }break;
+            
+            case EXIT_UPPER_MONITOR_CTR:{
+                SetUpperMonitorOnline(0);
+            }break;
+
+            case MINIPC_ALIVE:{
+                Reset_MiniPC_Alive_Count();
+            }break;
+            
+            default:{
+                
+            }break;
+        }
     }
     else if(pData[0] == START_UPPER_MONITOR_CTR){
                 SetUpperMonitorOnline(1);
@@ -152,6 +165,11 @@ void ResetUpperMonitorCmd(void){
     Set_Flag_AutoShoot(0);
     SetUpperMonitorOnline(0);
     SetWorkState(CRUISE_STATE);
+}
+
+void ResetUpperMonitorCmd_d1_d2(void){
+    upperMonitorCmd.d1 = 0;
+    upperMonitorCmd.d2 = 0;
 }
 
 void RequestFinishFrictionSpeedUp(void){

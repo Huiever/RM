@@ -5,7 +5,7 @@
 #include "flags.h"
 #include "can_bus_task.h"
 #include "imu.h"
-
+#include "sys.h"
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
 PID_Regulator_t GMPSpeedPID    = GIMBAL_MOTOR_PITCH_SPEED_PID_DEFAULT;
 PID_Regulator_t GMYPositionPID = GIMBAL_MOTOR_YAW_POSITION_PID_DEFAULT;
@@ -28,6 +28,7 @@ void Control_Task(void){
     time_tick_1ms++;
     WorkStateFSM();
     MiniPC_Alive_Count_PlusPlus();
+    printf("count:%d\r\n", Get_MiniPC_Alive_Count());
     if(Get_MiniPC_Alive_Count() > 3000 && GetWorkState() == SHOOT_STATE){
         ResetUpperMonitorCmd();
     }
@@ -247,9 +248,16 @@ void SetGimbalMotorOutput(void){
 void UpperMonitorControlLoop(void){
     UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
     switch(cmd.gimbalMovingCtrType){
+        case GIMBAL_CMD_MOVETO:{
+            Gimbal_Target.yaw_angle_target   += cmd.d1;
+            Gimbal_Target.pitch_angle_target += cmd.d2;
+//            printf("pitch_angle_target_:%5f, cmd.d2:%f\r\n",Gimbal_Target.pitch_angle_target,cmd.d2);
+            ResetUpperMonitorCmd();
+        }break;
         case GIMBAL_CMD_MOVEBY:{
             Gimbal_Target.yaw_angle_target   += cmd.d1;
             Gimbal_Target.pitch_angle_target += cmd.d2;
+//            printf("pitch_angle_target:%5f\r\n",Gimbal_Target.pitch_angle_target);
         }break;
         default:{
             

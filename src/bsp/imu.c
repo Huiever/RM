@@ -73,6 +73,27 @@ uint8_t MPU6500_Write_Reg(uint8_t const reg, uint8_t const data)
   MPU6500_NSS_High();
   return 0;
 }
+//Write a register to MPU6500
+uint8_t MPU6500_Write_Regs(uint8_t const reg, uint8_t const *pData, uint8_t len)
+{
+    static uint8_t MPU_Tx;
+    MPU6500_NSS_Low();
+    MPU_Tx = reg&0x7f;
+    SPI_ReadWriteByte(MPU_Tx);
+    for(int i = 0;i<len;i++)
+    {
+        SPI_ReadWriteByte(pData[i]);
+    }
+    MPU6500_NSS_High();
+    return 0;
+}
+
+uint8_t MPU6500_Write_Regss(uint8_t const addr,uint8_t reg,uint8_t len,uint8_t *buf)
+{
+    MPU6500_Write_Regs(reg, buf, len);
+    return 0;
+}
+
 //Read a register from MPU6500
 uint8_t MPU6500_Read_Reg(uint8_t const reg)
 {
@@ -85,19 +106,26 @@ uint8_t MPU6500_Read_Reg(uint8_t const reg)
   return MPU_Rx;
 }
 //Read registers from MPU6500,address begin with regAddr
-uint8_t MPU6500_Read_Regs(uint8_t const regAddr, uint8_t *pData, uint8_t len)
+uint8_t MPU6500_Read_Regs(uint8_t const reg, uint8_t *pData, uint8_t len)
 {
-  static uint8_t  MPU_Tx;//MPU_Rx;//
-  MPU6500_NSS_Low();
-  MPU_Tx = regAddr|0x80;
+    static uint8_t  MPU_Tx;//MPU_Rx;//
+    MPU6500_NSS_Low();
+    MPU_Tx = reg|0x80;
     SPI_ReadWriteByte(MPU_Tx);
     for(int i = 0;i<len;i++)
-  {
+    {
         pData[i] = SPI_ReadWriteByte(0x00);//0xff
     }
-  MPU6500_NSS_High();
-  return 0;
+    MPU6500_NSS_High();
+    return 0;
 }
+
+uint8_t MPU6500_Read_Regss(uint8_t const addr,uint8_t reg,uint8_t len,uint8_t *buf)
+{
+    MPU6500_Read_Regs(reg, buf, len);
+    return 0;
+}
+
 //Write IST8310 register through MPU6500
 static void IST_Reg_Write_By_MPU(uint8_t addr, uint8_t data){
   MPU6500_Write_Reg(MPU6500_I2C_SLV1_CTRL, 0x00);
@@ -1172,7 +1200,7 @@ void IMU_getYawPitchRoll(void)
     yaw_temp = imu.rip.yaw; 
     if(yaw_temp - last_yaw_temp>= 330){
         yaw_count--;
-    }
+    } 
     else if (yaw_temp - last_yaw_temp <= -330){
         yaw_count++;
     }
@@ -1192,7 +1220,7 @@ static int8_t IMU_GET_CONTROL_TEMPERATURE(void){
 			}
 			count=1;
 		}
-		//printf("%8d\r\n", control_temperature);
+//		printf("%8d\r\n", control_temperature);
     return control_temperature;
 }
 
@@ -1232,7 +1260,6 @@ static void IMU_temp_Control(double temp)
     }
 }
 
-
 float get_yaw_angle(void){
   return imu.rip.yaw;
 }
@@ -1270,8 +1297,7 @@ void imu_main(void){
     IMU_AHRSupdate();
     //MahonyAHRSupdateIMU(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az);
     //MadgwickQuaternionUpdate(imu.rip.ax,imu.rip.ay,imu.rip.az, imu.rip.gx,imu.rip.gy,imu.rip.gz);
-    IMU_getYawPitchRoll();
-    delay_ms(5);
+//    IMU_temp_Control(imu.rip.temp);
     IMU_getYawPitchRoll();
     IMU_GET_CONTROL_TEMPERATURE();
     delay_ms(5);

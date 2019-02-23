@@ -44,11 +44,11 @@ void UART6_PrintCh(uint8_t ch){
 void USART6_IRQHandler(void){
   if(USART_GetITStatus(USART6, USART_IT_TXE) != RESET){
     if(!FIFO_S_IsEmpty(UART_TranFifo)){
-			uint16_t data = (uint16_t)FIFO_S_Get(UART_TranFifo);
-			USART_SendData(USART6, data);
+            uint16_t data = (uint16_t)FIFO_S_Get(UART_TranFifo);
+            USART_SendData(USART6, data);
     }
     else{
-			USART_ITConfig(USART6, USART_IT_TXE, DISABLE);
+            USART_ITConfig(USART6, USART_IT_TXE, DISABLE);
     }
   }
   else if(USART_GetITStatus(USART6, USART_IT_RXNE) != RESET){
@@ -56,11 +56,11 @@ void USART6_IRQHandler(void){
     static uint8_t receivedBytes = 0;
     uint8_t tmp = USART_ReceiveData(USART6);
     switch(receivedBytes){
-			case 0:{
+      case 0:{
         if(tmp == 0x0a){
           receivedBytes++;
         }
-				else{
+        else{
           receivedBytes = 0;
         }
         break;
@@ -69,7 +69,7 @@ void USART6_IRQHandler(void){
         if(tmp == 0x0d){
           receivedBytes++;
         }
-				else{
+                else{
           receivedBytes = 0;
         }
         break;
@@ -103,7 +103,7 @@ void USART6_IRQHandler(void){
         if(tmp == 0x0d){
           receivedBytes++;
         }
-				else{
+      else{
           receivedBytes = 0;
         }
         break;
@@ -111,7 +111,7 @@ void USART6_IRQHandler(void){
       case 8:{
         if(tmp == 0x0a){
           UpperMonitorDataProcess(rx_buffer);
-					LED1=~LED1;
+          LED1=~LED1;
         }
         receivedBytes = 0;
         break;

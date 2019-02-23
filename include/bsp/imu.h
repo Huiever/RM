@@ -126,6 +126,10 @@ extern volatile float twoKp;             // 2 * proportional gain (Kp)
 extern volatile float twoKi;             // 2 * integral gain (Ki)
 extern volatile float q0, q1, q2, q3;    // quaternion of sensor frame relative to auxiliary frame
 
+
+extern uint8_t MPU6500_Write_Regss(uint8_t const addr,uint8_t reg,uint8_t len,uint8_t *buf);
+extern uint8_t MPU6500_Read_Regss(uint8_t const addr,uint8_t reg,uint8_t len,uint8_t *buf);
+
 //---------------------------------------------------------------------------------------------------
 // Function declarations
 

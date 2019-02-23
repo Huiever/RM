@@ -123,6 +123,7 @@ uint8_t GetUpperMonitorOnline(void);
 void SetUpperMonitorOnline(uint8_t isOnline);
 void UpperMonitorDataProcess(uint8_t *pData);
 void ResetUpperMonitorCmd(void);
+void ResetUpperMonitorCmd_d1_d2(void);
 void RequestFinishFrictionSpeedUp(void);
 
 ControlMode_e GetControlMode(void);
