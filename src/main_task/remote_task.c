@@ -209,13 +209,8 @@ void RemoteDataProcess(uint8_t *pData){
                 
                 Gimbal_Target.pitch_angle_target += (float)(RC_CtrlData.rc.ch3 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
                                                     * STICK_TO_PITCH_ANGLE_INC_FACT;
-//                if(Get_Flag(CM360rotate)==0)
-//                {
-//                Gimbal_Target.yaw_angle_target   += (RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
-//                                                    * STICK_TO_YAW_ANGLE_INC_FACT;
-//                }
-                
-                printf("%6.3f\r\n",Gimbal_Target.pitch_angle_target);
+                Gimbal_Target.yaw_angle_target   += (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
+                                                    * STICK_TO_YAW_ANGLE_INC_FACT;
 
                 if( RC_CtrlData.rc.s1 == 1 ){
                     SetFrictionWheelSpeed(1000);

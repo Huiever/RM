@@ -16,6 +16,7 @@
 #include "can2.h"
 #include "dbus.h" 
 #include "delay.h"
+#include "usart2.h"
 #include "usart3.h"
 #include "flags.h"
 #include "power.h"
@@ -32,6 +33,7 @@ void BSP_Pre_Init(void){
     BEEP_Init();
 
     delay_ms(100);
+    USART2_Init(115200);
     USART3_Init(115200);
 
     temperature_ADC_init();

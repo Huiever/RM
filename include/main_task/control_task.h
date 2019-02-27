@@ -2,6 +2,7 @@
 #define _CONTROL_TASK_H_
 
 #include "main.h"
+#include "pid_regulator.h"
 
 #define PREPARE_TIME_TICK_MS      4000
 #define YAW_POSITION_KP_DEFAULTS  25
@@ -12,8 +13,8 @@
 #define YAW_SPEED_KI_DEFAULTS  0
 #define YAW_SPEED_KD_DEFAULTS  0
 
-#define PITCH_POSITION_KP_DEFAULTS  20
-#define PITCH_POSITION_KI_DEFAULTS  0
+#define PITCH_POSITION_KP_DEFAULTS  15
+#define PITCH_POSITION_KI_DEFAULTS  0.01
 #define PITCH_POSITION_KD_DEFAULTS  0
 
 #define PITCH_SPEED_KP_DEFAULTS  19
@@ -148,6 +149,13 @@ typedef enum{
 	&PID_Reset,\
 }
 
+
+extern PID_Regulator_t GMPPositionPID ;
+extern PID_Regulator_t GMPSpeedPID    ;
+extern PID_Regulator_t GMYPositionPID ;
+extern PID_Regulator_t GMYSpeedPID    ;
+extern PID_Regulator_t RAMMERSpeedPID ;
+
 void Control_Task(void);
 void ControtTaskInit(void);
 void WorkStateFSM(void);
@@ -165,5 +173,8 @@ void RammerControlLoop(void);
 void RammerSpeedPID( int16_t TargetSpeed);
 void BigSymbolRecgShootControl(void);
 uint8_t RammerHeatControl(void);
+
+void SetGimbalYawPID(float v_kp, float v_ki, float v_kd, float p_kp, float p_ki, float p_kd);
+void SetGimbalPitPID(float v_kp, float v_ki, float v_kd, float p_kp, float p_ki, float p_kd);
 
 #endif

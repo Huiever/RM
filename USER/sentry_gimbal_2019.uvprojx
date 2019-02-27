@@ -337,7 +337,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F427_437xx,USE_STDPERIPH_DRIVER,__FPU_USED,__FPU_PRESENT,ARM_MATH_CM4,__CC_ARM,ARM_MATH_MATRIX_CHECK,ARM_MATH_ROUNDING</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\FWLIB\inc;..\include\bsp;..\include\main_task;..\include\system;..\DSP\Include;..\MPU6500</IncludePath>
+              <IncludePath>..\CORE;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\FWLIB\inc;..\include\bsp;..\include\main_task;..\include\system;..\DSP\Include;..\MPU6500;..\USMART</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -400,41 +400,6 @@
               <FileName>system_stm32f4xx.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\system_stm32f4xx.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>system</GroupName>
-          <Files>
-            <File>
-              <FileName>delay.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\system\delay.c</FilePath>
-            </File>
-            <File>
-              <FileName>sys.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\system\sys.c</FilePath>
-            </File>
-            <File>
-              <FileName>visualscope.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\system\visualscope.c</FilePath>
-            </File>
-            <File>
-              <FileName>pid_regulator.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\system\pid_regulator.c</FilePath>
-            </File>
-            <File>
-              <FileName>ramp.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\system\ramp.c</FilePath>
-            </File>
-            <File>
-              <FileName>flags.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\system\flags.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -524,32 +489,17 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>main_task</GroupName>
+          <GroupName>DSP</GroupName>
           <Files>
             <File>
-              <FileName>can_bus_task.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\main_task\can_bus_task.c</FilePath>
-            </File>
-            <File>
-              <FileName>control_task.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\main_task\control_task.c</FilePath>
-            </File>
-            <File>
-              <FileName>remote_task.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\main_task\remote_task.c</FilePath>
-            </File>
-            <File>
-              <FileName>judge_task.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\main_task\judge_task.c</FilePath>
+              <FileName>arm_cortexM4lf_math.lib</FileName>
+              <FileType>4</FileType>
+              <FilePath>..\DSP\arm_cortexM4lf_math.lib</FilePath>
             </File>
           </Files>
         </Group>
         <Group>
-          <GroupName>bsp</GroupName>
+          <GroupName>BSP</GroupName>
           <Files>
             <File>
               <FileName>bsp.c</FileName>
@@ -612,6 +562,11 @@
               <FilePath>..\src\bsp\timer.c</FilePath>
             </File>
             <File>
+              <FileName>usart2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\bsp\usart2.c</FilePath>
+            </File>
+            <File>
               <FileName>usart3.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\bsp\usart3.c</FilePath>
@@ -634,37 +589,82 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>DSP</GroupName>
+          <GroupName>USMART</GroupName>
           <Files>
             <File>
-              <FileName>arm_cortexM4lf_math.lib</FileName>
-              <FileType>4</FileType>
-              <FilePath>..\DSP\arm_cortexM4lf_math.lib</FilePath>
+              <FileName>usmart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USMART\usmart.c</FilePath>
+            </File>
+            <File>
+              <FileName>usmart_config.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USMART\usmart_config.c</FilePath>
+            </File>
+            <File>
+              <FileName>usmart_str.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\USMART\usmart_str.c</FilePath>
             </File>
           </Files>
         </Group>
         <Group>
-          <GroupName>MPU6500</GroupName>
+          <GroupName>SYSTEM</GroupName>
           <Files>
             <File>
-              <FileName>inv_mpu.c</FileName>
+              <FileName>delay.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\MPU6500\inv_mpu.c</FilePath>
+              <FilePath>..\src\system\delay.c</FilePath>
             </File>
             <File>
-              <FileName>inv_mpu_dmp_motion_driver.c</FileName>
+              <FileName>sys.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\MPU6500\inv_mpu_dmp_motion_driver.c</FilePath>
+              <FilePath>..\src\system\sys.c</FilePath>
             </File>
             <File>
-              <FileName>mpu6050.c</FileName>
+              <FileName>visualscope.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\MPU6500\mpu6050.c</FilePath>
+              <FilePath>..\src\system\visualscope.c</FilePath>
             </File>
             <File>
-              <FileName>myiic.c</FileName>
+              <FileName>pid_regulator.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\MPU6500\myiic.c</FilePath>
+              <FilePath>..\src\system\pid_regulator.c</FilePath>
+            </File>
+            <File>
+              <FileName>ramp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\system\ramp.c</FilePath>
+            </File>
+            <File>
+              <FileName>flags.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\system\flags.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>MAIN_TASK</GroupName>
+          <Files>
+            <File>
+              <FileName>can_bus_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\main_task\can_bus_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>control_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\main_task\control_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>remote_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\main_task\remote_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>judge_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\main_task\judge_task.c</FilePath>
             </File>
           </Files>
         </Group>

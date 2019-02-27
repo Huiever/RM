@@ -21,7 +21,7 @@
 #define Ki IMU_Ki                                            /* 
                                                               * integral gain governs rate of 
                                                               * convergence of gyroscope biases 
-                                                                                                                            */
+                                                                                                                             */
 volatile float        q0 = 1.0f;
 volatile float        q1 = 0.0f;
 volatile float        q2 = 0.0f;
@@ -31,16 +31,15 @@ static volatile float gx, gy, gz, ax, ay, az, mx, my, mz;
 volatile uint32_t     last_update, now_update;               /* Sampling cycle count, ubit ms */
 uint8_t               mpu_buff[14];                          /* buffer to save imu raw data */
 uint8_t               ist_buff[6];                           /* buffer to save IST8310 raw data */
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}; // Bias corrections for gyro and accelerometer
 
                                                                                                     
-imu_t                                  imu = {
-                                            {0,0,0,0,0,0,0,0,0,0},       //raw
-                                            {0,0,0,0,0,0,
-                                                {-10.55f, 0.83f,11.92f,1.00f,-0.003f, -0.049f,1.021f,-0.015f,0.982f}
-                                            },     //offset
-                                            {0,0,0,0,0,0,0,0,0,0,0,0,0}  //rip
-                                            };
+imu_t imu = {
+            {0,0,0,0,0,0,0,0,0,0},       //raw
+            {0,0,0,0,0,0,
+                {-10.55f, 0.83f,11.92f,1.00f,-0.003f, -0.049f,1.021f,-0.015f,0.982f}
+            },     //offset
+            {0,0,0,0,0,0,0,0,0,0,0,0,0}  //rip
+            };
 
 int32_t MPU6500_FIFO[6][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平均值
 int16_t IST8310_FIFO[3][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平均值 
@@ -370,195 +369,6 @@ void imu_calibrate(void){
     imu.raw.gz -=  imu.offset.gz;
 }
 
-
-
-// Function which accumulates gyro and accelerometer data after device initialization. It calculates the average
-// of the at-rest readings and then loads the resulting offsets into accelerometer and gyro bias registers.
-void calibrateMPU6050(float * dest1, float * dest2)
-{  
-  uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
-  uint16_t ii, packet_count, fifo_count;
-  int32_t gyro_bias[3] = {0, 0, 0}, accel_bias[3] = {0, 0, 0};
-
-// reset device, reset all registers, clear gyro and accelerometer bias registers
-
-  MPU6500_Write_Reg(PWR_MGMT_1, 0x80); // Write a one to bit 7 reset bit; toggle reset device
-  delay_ms(100);
-   
-// get stable time source
-// Set clock source to be PLL with x-axis gyroscope reference, bits 2:0 = 001
-  MPU6500_Write_Reg(PWR_MGMT_1, 0x01);
-  MPU6500_Write_Reg(PWR_MGMT_2, 0x00);
-  delay_ms(200);
-  
-// Configure device for bias calculation
-
-  MPU6500_Write_Reg(INT_ENABLE, 0x00);
-  MPU6500_Write_Reg(FIFO_EN, 0x00);
-  MPU6500_Write_Reg(PWR_MGMT_1, 0x00);
-  MPU6500_Write_Reg(I2C_MST_CTRL, 0x00);
-  MPU6500_Write_Reg(USER_CTRL, 0x00);
-  MPU6500_Write_Reg(USER_CTRL, 0x0C);
-
-
-//  writeByte(MPU6050_ADDRESS, INT_ENABLE, 0x00);   // Disable all interrupts
-//  writeByte(MPU6050_ADDRESS, FIFO_EN, 0x00);      // Disable FIFO
-//  writeByte(MPU6050_ADDRESS, PWR_MGMT_1, 0x00);   // Turn on internal clock source
-//  writeByte(MPU6050_ADDRESS, I2C_MST_CTRL, 0x00); // Disable I2C master
-//  writeByte(MPU6050_ADDRESS, USER_CTRL, 0x00);    // Disable FIFO and I2C master modes
-//  writeByte(MPU6050_ADDRESS, USER_CTRL, 0x0C);    // Reset FIFO and DMP
-  delay_ms(15);
-  
-// Configure MPU6050 gyro and accelerometer for bias calculation
-  MPU6500_Write_Reg(CONFIG, 0x01);
-  MPU6500_Write_Reg(SMPLRT_DIV, 0x00);
-  MPU6500_Write_Reg(GYRO_CONFIG, 0x00);
-  MPU6500_Write_Reg(ACCEL_CONFIG, 0x00);
-
-
-//  writeByte(MPU6050_ADDRESS, CONFIG, 0x01);      // Set low-pass filter to 188 Hz
-//  writeByte(MPU6050_ADDRESS, SMPLRT_DIV, 0x00);  // Set sample rate to 1 kHz
-//  writeByte(MPU6050_ADDRESS, GYRO_CONFIG, 0x00);  // Set gyro full-scale to 250 degrees per second, maximum sensitivity
-//  writeByte(MPU6050_ADDRESS, ACCEL_CONFIG, 0x00); // Set accelerometer full-scale to 2 g, maximum sensitivity
-// 
-  uint16_t  gyrosensitivity  = 32.8;   // = 131 LSB/degrees/sec
-  uint16_t  accelsensitivity = 16384;  // = 16384 LSB/g
-
-// Configure FIFO to capture accelerometer and gyro data for bias calculation
-
-  MPU6500_Write_Reg(USER_CTRL, 0x40);
-  MPU6500_Write_Reg(FIFO_EN, 0x78);
-
-//  writeByte(MPU6050_ADDRESS, USER_CTRL, 0x40);   // Enable FIFO  
-//  writeByte(MPU6050_ADDRESS, FIFO_EN, 0x78);     // Enable gyro and accelerometer sensors for FIFO  (max size 1024 bytes in MPU-6050)
-  delay_ms(80); // accumulate 80 samples in 80 milliseconds = 960 bytes
-
-// At end of sample accumulation, turn off FIFO sensor read
-
-  MPU6500_Write_Reg(FIFO_EN, 0x00);
-  MPU6500_Read_Regs(FIFO_COUNTH,&data[0],2);
-
-//  writeByte(MPU6050_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
-//  readBytes(MPU6050_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
-  fifo_count = ((uint16_t)data[0] << 8) | data[1];
-  packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
-
-  for (ii = 0; ii < packet_count; ii++) {
-    int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
-    
-    MPU6500_Read_Regs(FIFO_R_W,&data[0],12);
-//    readBytes(MPU6050_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
-    
-    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
-    accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
-    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;    
-    gyro_temp[0]  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
-    gyro_temp[1]  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
-    gyro_temp[2]  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;
-    
-    accel_bias[0] += (int32_t) accel_temp[0]; // Sum individual signed 16-bit biases to get accumulated signed 32-bit biases
-    accel_bias[1] += (int32_t) accel_temp[1];
-    accel_bias[2] += (int32_t) accel_temp[2];
-    gyro_bias[0]  += (int32_t) gyro_temp[0];
-    gyro_bias[1]  += (int32_t) gyro_temp[1];
-    gyro_bias[2]  += (int32_t) gyro_temp[2];
-            
-}
-    accel_bias[0] /= (int32_t) packet_count; // Normalize sums to get average count biases
-    accel_bias[1] /= (int32_t) packet_count;
-    accel_bias[2] /= (int32_t) packet_count;
-    gyro_bias[0]  /= (int32_t) packet_count;
-    gyro_bias[1]  /= (int32_t) packet_count;
-    gyro_bias[2]  /= (int32_t) packet_count;
-    
-  if(accel_bias[2] > 0L) {accel_bias[2] -= (int32_t) accelsensitivity;}  // Remove gravity from the z-axis accelerometer bias calculation
-  else {accel_bias[2] += (int32_t) accelsensitivity;}
- 
-// Construct the gyro biases for push to the hardware gyro bias registers, which are reset to zero upon device startup
-  data[0] = (-gyro_bias[0]/4  >> 8) & 0xFF; // Divide by 4 to get 32.9 LSB per deg/s to conform to expected bias input format
-  data[1] = (-gyro_bias[0]/4)       & 0xFF; // Biases are additive, so change sign on calculated average gyro biases
-  data[2] = (-gyro_bias[1]/4  >> 8) & 0xFF;
-  data[3] = (-gyro_bias[1]/4)       & 0xFF;
-  data[4] = (-gyro_bias[2]/4  >> 8) & 0xFF;
-  data[5] = (-gyro_bias[2]/4)       & 0xFF;
-
-// Push gyro biases to hardware registers
-
-
-//  MPU6500_Write_Reg(INT_ENABLE, 0x00);
-//  MPU6500_Write_Reg(FIFO_EN, 0x00);
-//  MPU6500_Write_Reg(PWR_MGMT_1, 0x00);
-//  MPU6500_Write_Reg(I2C_MST_CTRL, 0x00);
-//  MPU6500_Write_Reg(USER_CTRL, 0x00);
-//  MPU6500_Write_Reg(USER_CTRL, 0x00);
-
-
-  MPU6500_Write_Reg( XG_OFFS_USRH, data[0]); 
-  MPU6500_Write_Reg( XG_OFFS_USRL, data[1]);
-  MPU6500_Write_Reg( YG_OFFS_USRH, data[2]);
-  MPU6500_Write_Reg( YG_OFFS_USRL, data[3]);
-  MPU6500_Write_Reg( ZG_OFFS_USRH, data[4]);
-  MPU6500_Write_Reg( ZG_OFFS_USRL, data[5]);
-
-  dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity; // construct gyro bias in deg/s for later manual subtraction
-  dest1[1] = (float) gyro_bias[1]/(float) gyrosensitivity;
-  dest1[2] = (float) gyro_bias[2]/(float) gyrosensitivity;
-
-// Construct the accelerometer biases for push to the hardware accelerometer bias registers. These registers contain
-// factory trim values which must be added to the calculated accelerometer biases; on boot up these registers will hold
-// non-zero values. In addition, bit 0 of the lower byte must be preserved since it is used for temperature
-// compensation calculations. Accelerometer bias registers expect bias input as 2048 LSB per g, so that
-// the accelerometer biases calculated above must be divided by 8.
-
-  int32_t accel_bias_reg[3] = {0, 0, 0}; // A place to hold the factory accelerometer trim biases
-  MPU6500_Read_Regs(XA_OFFSET_H,&data[0],2);
-//  readBytes(MPU6050_ADDRESS, XA_OFFSET_H, 2, &data[0]); // Read factory accelerometer trim values
-  accel_bias_reg[0] = (int16_t) ((int16_t)data[0] << 8) | data[1];
-
-  MPU6500_Read_Regs(YA_OFFSET_H,&data[0],2);
-//  readBytes(MPU6050_ADDRESS, YA_OFFSET_H, 2, &data[0]);
-  accel_bias_reg[1] = (int16_t) ((int16_t)data[0] << 8) | data[1];
-
-  MPU6500_Read_Regs(ZA_OFFSET_H,&data[0],2);
-//  readBytes(MPU6050_ADDRESS, ZA_OFFSET_H, 2, &data[0]);
-  accel_bias_reg[2] = (int16_t) ((int16_t)data[0] << 8) | data[1];
-  
-  uint32_t mask = 1uL; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
-  uint8_t mask_bit[3] = {0, 0, 0}; // Define array to hold mask bit for each accelerometer bias axis
-  
-  for(ii = 0; ii < 3; ii++) {
-    if(accel_bias_reg[ii] & mask) mask_bit[ii] = 0x01; // If temperature compensation bit is set, record that fact in mask_bit
-  }
-
-  // Construct total accelerometer bias, including calculated average accelerometer bias from above
-  accel_bias_reg[0] -= (accel_bias[0]/8); // Subtract calculated averaged accelerometer bias scaled to 2048 LSB/g (16 g full scale)
-  accel_bias_reg[1] -= (accel_bias[1]/8);
-  accel_bias_reg[2] -= (accel_bias[2]/8);
- 
-  data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
-  data[1] = (accel_bias_reg[0])      & 0xFF;
-  data[1] = data[1] | mask_bit[0]; // preserve temperature compensation bit when writing back to accelerometer bias registers
-  data[2] = (accel_bias_reg[1] >> 8) & 0xFF;
-  data[3] = (accel_bias_reg[1])      & 0xFF;
-  data[3] = data[3] | mask_bit[1]; // preserve temperature compensation bit when writing back to accelerometer bias registers
-  data[4] = (accel_bias_reg[2] >> 8) & 0xFF;
-  data[5] = (accel_bias_reg[2])      & 0xFF;
-  data[5] = data[5] | mask_bit[2]; // preserve temperature compensation bit when writing back to accelerometer bias registers
-
-  // Push accelerometer biases to hardware registers
-//  writeByte(MPU6050_ADDRESS, XA_OFFSET_H, data[0]);  
-//  writeByte(MPU6050_ADDRESS, XA_OFFSET_L_TC, data[1]);
-//  writeByte(MPU6050_ADDRESS, YA_OFFSET_H, data[2]);
-//  writeByte(MPU6050_ADDRESS, YA_OFFSET_L_TC, data[3]);  
-//  writeByte(MPU6050_ADDRESS, ZA_OFFSET_H, data[4]);
-//  writeByte(MPU6050_ADDRESS, ZA_OFFSET_L_TC, data[5]);
-
-// Output scaled accelerometer biases for manual subtraction in the main program
-   dest2[0] = (float)accel_bias[0]/(float)accelsensitivity; 
-   dest2[1] = (float)accel_bias[1]/(float)accelsensitivity;
-   dest2[2] = (float)accel_bias[2]/(float)accelsensitivity;
-}
-
 //Get 6 axis data from MPU6500
 void IMU_Get_Raw_Data(void)
 {
@@ -594,26 +404,16 @@ void IMU_Get_Raw_Data(void)
 
     imu_calibrate();
 
-//    imu.raw.ax -=  accelBias[0];
-//    imu.raw.ay -=  accelBias[1];
-//    imu.raw.az -=  accelBias[2];
-
-//    imu.raw.gx -=  gyroBias[0];
-//    imu.raw.gy -=  gyroBias[1];
-//    imu.raw.gz -=  gyroBias[2];
-
-//    imu.rip.temp = 21 + imu.raw.temp / 333.87f;
-
     imu.rip.temp = imu.raw.temp * MPU6500_TEMPERATURE_FACTOR + MPU6500_TEMPERATURE_OFFSET;
 
 //unit:m/s2
-//    imu.rip.ax = (float)(imu.raw.ax * 9.8 / 16384);
-//    imu.rip.ay = (float)(imu.raw.ay * 9.8 / 16384);
-//    imu.rip.az = (float)(imu.raw.az * 9.8 / 16384);
+    imu.rip.ax = (float)(imu.raw.ax * 9.8 / 16384);
+    imu.rip.ay = (float)(imu.raw.ay * 9.8 / 16384);
+    imu.rip.az = (float)(imu.raw.az * 9.8 / 16384);
 
-    imu.rip.ax = (float)(imu.raw.ax / 16384);
-    imu.rip.ay = (float)(imu.raw.ay / 16384);
-    imu.rip.az = (float)(imu.raw.az / 16384);
+//    imu.rip.ax = (float)(imu.raw.ax / 16384);
+//    imu.rip.ay = (float)(imu.raw.ay / 16384);
+//    imu.rip.az = (float)(imu.raw.az / 16384);
 
     static uint8_t updata_count=0;
     //加速度计低通滤波
@@ -647,9 +447,9 @@ void IMU_Get_Raw_Data(void)
         accel_fliter_3[2] = accel_fliter_2[2] * fliter_num[0] + accel_fliter_1[2] * fliter_num[1] + imu.rip.az * fliter_num[2];
     }
     
-//    imu.rip.ax = accel_fliter_3[0];
-//    imu.rip.ay = accel_fliter_3[1];
-//    imu.rip.az = accel_fliter_3[2];
+    imu.rip.ax = accel_fliter_3[0];
+    imu.rip.ay = accel_fliter_3[1];
+    imu.rip.az = accel_fliter_3[2];
     
     /* +-1000dps -> rad/s */
     imu.rip.gx = (float)(imu.raw.gx /32.8f /57.3f);
@@ -1294,12 +1094,11 @@ int16_t get_mpu_gz(void){
 
 void imu_main(void){
     IMU_Get_Raw_Data();
-    IMU_AHRSupdate();
-    //MahonyAHRSupdateIMU(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az);
-    //MadgwickQuaternionUpdate(imu.rip.ax,imu.rip.ay,imu.rip.az, imu.rip.gx,imu.rip.gy,imu.rip.gz);
+//    IMU_AHRSupdate();
+//    MahonyAHRSupdateIMU(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az);
+//    MadgwickQuaternionUpdate(imu.rip.ax,imu.rip.ay,imu.rip.az, imu.rip.gx,imu.rip.gy,imu.rip.gz);
 //    IMU_temp_Control(imu.rip.temp);
-    IMU_getYawPitchRoll();
-    IMU_GET_CONTROL_TEMPERATURE();
+//    IMU_getYawPitchRoll();
     delay_ms(5);
 #if Monitor_IMU_Angle == 1
     printf("yaw_angle:%8.3lf   pit_angle:%8.3lf  rol_angle:%8.3lf\r\n", imu.rip.yaw, imu.rip.pit, imu.rip.rol);

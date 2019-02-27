@@ -1,67 +1,17 @@
 #ifndef __USART2_H
 #define __USART2_H
 
-void Initial_UART2(unsigned long baudrate);
-void UART2_Put_Char(unsigned char DataToSend);
-void UART2_Put_String(unsigned char *Str);
+#include "stdio.h"	
+#include "stm32f4xx_conf.h"
+#include "sys.h"
 
-extern float angle_temp;
-	
-struct STime
-{
-	unsigned char ucYear;
-	unsigned char ucMonth;
-	unsigned char ucDay;
-	unsigned char ucHour;
-	unsigned char ucMinute;
-	unsigned char ucSecond;
-	unsigned short usMiliSecond;
-};
-struct SAcc
-{
-	short a[3];
-	short T;
-};
-struct SGyro
-{
-	short w[3];
-	short T;
-};
-struct SAngle
-{
-	short Angle[3];
-	short T;
-};
-struct SMag
-{
-	short h[3];
-	short T;
-};
+#define USART_REC_LEN  200
+#define EN_USART2_RX 	 1
+	  	
+extern u8  USART_RX_BUF_2[USART_REC_LEN];
+extern u16 USART_RX_STA_2;
 
-struct SDStatus
-{
-	short sDStatus[4];
-};
-
-struct SPress
-{
-	long lPressure;
-	long lAltitude;
-};
-
-struct SLonLat
-{
-	long lLon;
-	long lLat;
-};
-
-struct SGPSV
-{
-	short sGPSHeight;
-	short sGPSYaw;
-	long lGPSVelocity;
-};
+void USART2_Init(u32 bound);
+void USART2_SendChar(unsigned char b);
 
 #endif
-
-//------------------End of File----------------------------

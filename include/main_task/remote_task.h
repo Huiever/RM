@@ -2,8 +2,8 @@
 #define _REOMTE_TASK_H_
 #include "main.h"
 
-#define PITCH_MAX                   45.0f
-#define PITCH_MIN                   -45.0f
+#define PITCH_MAX                   34.0f
+#define PITCH_MIN                   -24.0f
 
 #define FRICTION_RAMP_TICK_COUNT	50
 

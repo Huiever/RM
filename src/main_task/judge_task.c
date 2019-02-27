@@ -169,44 +169,44 @@ void Judge_Init(void)
     GPIO_InitTypeDef    GPIO_InitStructure;
     USART_InitTypeDef   USART_InitStructure;
     NVIC_InitTypeDef    NVIC_InitStructure;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_DMA1, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-    GPIO_PinAFConfig(GPIOD, GPIO_PinSource6, GPIO_AF_USART2);
-    GPIO_PinAFConfig(GPIOD, GPIO_PinSource5, GPIO_AF_USART2);
-    USART_DeInit(USART2);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE | RCC_AHB1Periph_DMA1, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART7, ENABLE);
+    GPIO_PinAFConfig(GPIOE, GPIO_PinSource7, GPIO_AF_UART7);
+    GPIO_PinAFConfig(GPIOE, GPIO_PinSource8, GPIO_AF_UART7);
+    USART_DeInit(UART7);
     // PD6 - RX, PD5 - TX
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_5;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_8;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
+    GPIO_Init(GPIOE, &GPIO_InitStructure);
     USART_InitStructure.USART_BaudRate = 115200;
     USART_InitStructure.USART_WordLength = USART_WordLength_8b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
     USART_InitStructure.USART_Parity = USART_Parity_No;
     USART_InitStructure.USART_Mode = USART_Mode_Rx|USART_Mode_Tx;
     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-    USART_Init(USART2, &USART_InitStructure);
-    USART_Cmd(USART2, ENABLE);
-    NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
+    USART_Init(UART7, &USART_InitStructure);
+    USART_Cmd(UART7, ENABLE);
+    NVIC_InitStructure.NVIC_IRQChannel = UART7_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=2;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
-    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
+    USART_ITConfig(UART7, USART_IT_RXNE, ENABLE);
 
     TIM3_Configuration();
 
     //printf("Judge_Init: Accomplished\r\n");
 }
 
-void USART2_IRQHandler(void){
-    if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){
+void UART7_IRQHandler(void){
+    if(USART_GetITStatus(UART7, USART_IT_RXNE) != RESET){
         DMA_InitTypeDef		DMA_InitStructure;
         USART_InitTypeDef	USART_InitStructure;
         NVIC_InitTypeDef	NVIC_InitStructure;
-        USART_DeInit(USART2);
+        USART_DeInit(UART7);
         delay_ms(3);
         RCC_AHB1PeriphClockCmd( RCC_AHB1Periph_DMA1, ENABLE);
         USART_InitStructure.USART_BaudRate = 115200;
@@ -215,17 +215,17 @@ void USART2_IRQHandler(void){
         USART_InitStructure.USART_Parity = USART_Parity_No;
         USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
         USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-        USART_Init(USART2, &USART_InitStructure);
-        USART_Cmd(USART2, ENABLE);
-        USART_DMACmd(USART2,USART_DMAReq_Rx,ENABLE);
-        NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream5_IRQn;
+        USART_Init(UART7, &USART_InitStructure);
+        USART_Cmd(UART7, ENABLE);
+        USART_DMACmd(UART7,USART_DMAReq_Rx,ENABLE);
+        NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream3_IRQn;
         NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
         NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
         NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
         NVIC_Init(&NVIC_InitStructure);
-        DMA_DeInit(DMA1_Stream5);
-        DMA_InitStructure.DMA_Channel = DMA_Channel_4;
-        DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(USART2->DR);
+        DMA_DeInit(DMA1_Stream3);
+        DMA_InitStructure.DMA_Channel = DMA_Channel_5;
+        DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(UART7->DR);
         DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)judge_buffer;
         DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
         DMA_InitStructure.DMA_BufferSize = 1000;
@@ -239,16 +239,16 @@ void USART2_IRQHandler(void){
         DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_1QuarterFull;
         DMA_InitStructure.DMA_MemoryBurst = DMA_Mode_Normal;
         DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-        DMA_Init(DMA1_Stream5,&DMA_InitStructure);
-        DMA_ITConfig(DMA1_Stream5,DMA_IT_TC,ENABLE);
-        DMA_Cmd(DMA1_Stream5,ENABLE);
+        DMA_Init(DMA1_Stream3,&DMA_InitStructure);
+        DMA_ITConfig(DMA1_Stream3,DMA_IT_TC,ENABLE);
+        DMA_Cmd(DMA1_Stream3,ENABLE);
     }
 }
 
-void DMA1_Stream5_IRQHandler(void){
-	if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_TCIF5)){
-		DMA_ClearFlag(DMA1_Stream5, DMA_FLAG_TCIF5);
-		DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);
+void DMA1_Stream3_IRQHandler(void){
+	if(DMA_GetITStatus(DMA1_Stream3, DMA_IT_TCIF3)){
+		DMA_ClearFlag(DMA1_Stream3, DMA_FLAG_TCIF3);
+		DMA_ClearITPendingBit(DMA1_Stream3, DMA_IT_TCIF3);
 		for (u8 i = 0; i < 100; i++ ){
 			if(judge_buffer[i]==0xA5&&judge_buffer[i+6]==0x00){
 				if(judge_buffer[i+5]==CmdID_3){
@@ -347,8 +347,8 @@ void data_pack_handle(uint8_t *p_data, uint16_t len)
     for(t=0;t<frame_length;t++)
     {
         //printf("%d\t",*( (uint8_t *)computer_tx_buf + t ));
-        USART_SendData(USART2, *( computer_tx_buf + t ) );         //向串口2发送数据
-        while(USART_GetFlagStatus(USART2,USART_FLAG_TC)!=SET);//等待发送结束
+        USART_SendData(UART7, *( computer_tx_buf + t ) );         //向串口2发送数据
+        while(USART_GetFlagStatus(UART7,USART_FLAG_TC)!=SET);//等待发送结束
     }
 }
 
