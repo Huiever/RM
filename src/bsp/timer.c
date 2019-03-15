@@ -6,9 +6,9 @@ void TIM2_Init(void){
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE);
   tim.TIM_Period = 0xFFFFFFFF;
   tim.TIM_Prescaler = 84 - 1; 
-  tim.TIM_ClockDivision = TIM_CKD_DIV1;	
+  tim.TIM_ClockDivision = TIM_CKD_DIV1;    
   tim.TIM_CounterMode = TIM_CounterMode_Up;
-  TIM_ARRPreloadConfig(TIM2, ENABLE);	
+  TIM_ARRPreloadConfig(TIM2, ENABLE);    
   TIM_TimeBaseInit(TIM2, &tim);
   TIM_Cmd(TIM2,ENABLE);
 }
@@ -73,7 +73,7 @@ void TIM4_Init(void){
   tim.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_ARRPreloadConfig(TIM4, ENABLE);
   TIM_TimeBaseInit(TIM4, &tim);
-  TIM_ARRPreloadConfig(TIM4, ENABLE);	
+  TIM_ARRPreloadConfig(TIM4, ENABLE);    
   TIM_PrescalerConfig(TIM4, 0, TIM_PSCReloadMode_Update);
   TIM_UpdateDisableConfig(TIM4, ENABLE);
   TIM_Cmd(TIM4,ENABLE);

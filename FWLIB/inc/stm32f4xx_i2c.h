@@ -589,11 +589,11 @@ void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);
  ===============================================================================
                           I2C State Monitoring Functions
  ===============================================================================
-  This I2C driver provides three different ways for I2C state monitoring
+  This I2C driver provides three different ways for I2C state Monitoring
   depending on the application requirements and constraints:
          
    
-     1. Basic state monitoring (Using I2C_CheckEvent() function)
+     1. Basic state Monitoring (Using I2C_CheckEvent() function)
      -----------------------------------------------------------
         It compares the status registers (SR1 and SR2) content to a given event
         (can be the combination of one or more flags).
@@ -607,10 +607,10 @@ void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);
              - It is also suitable for users who need to define their own events.
 
           - Limitations
-             - If an error occurs (ie. error flags are set besides to the monitored 
+             - If an error occurs (ie. error flags are set besides to the Monitored 
                flags), the I2C_CheckEvent() function may return SUCCESS despite 
                the communication hold or corrupted real state. 
-               In this case, it is advised to use error interrupts to monitor 
+               In this case, it is advised to use error interrupts to Monitor 
                the error events and handle them in the interrupt IRQ handler.
          
      Note 
@@ -625,7 +625,7 @@ void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);
              and return to correct  communication status.
              
  
-     2. Advanced state monitoring (Using the function I2C_GetLastEvent())
+     2. Advanced state Monitoring (Using the function I2C_GetLastEvent())
      -------------------------------------------------------------------- 
         Using the function I2C_GetLastEvent() which returns the image of both status 
         registers in a single word (uint32_t) (Status Register 2 value is shifted left 
@@ -637,7 +637,7 @@ void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);
                function.
              - The returned value could be compared to events already defined in 
                this file or to custom values defined by user.
-               This function is suitable when multiple flags are monitored at the 
+               This function is suitable when multiple flags are Monitored at the 
                same time.
              - At the opposite of I2C_CheckEvent() function, this function allows 
                user to choose when an event is accepted (when all events flags are 
@@ -651,7 +651,7 @@ void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);
                (and ignores error flags).
       
  
-     3. Flag-based state monitoring (Using the function I2C_GetFlagStatus())
+     3. Flag-based state Monitoring (Using the function I2C_GetFlagStatus())
      -----------------------------------------------------------------------
      
       Using the function I2C_GetFlagStatus() which simply returns the status of 
@@ -661,30 +661,30 @@ void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);
              - This function could be used for specific applications or in debug 
                phase.
              - It is suitable when only one flag checking is needed (most I2C 
-               events are monitored through multiple flags).
+               events are Monitored through multiple flags).
           - Limitations: 
              - When calling this function, the Status register is accessed. 
                Some flags are cleared when the status register is accessed. 
                So checking the status of one Flag, may clear other ones.
-             - Function may need to be called twice or more in order to monitor 
+             - Function may need to be called twice or more in order to Monitor 
                one single event.           
  */
 
 /*
  ===============================================================================
-                          1. Basic state monitoring
+                          1. Basic state Monitoring
  ===============================================================================
  */
 ErrorStatus I2C_CheckEvent(I2C_TypeDef* I2Cx, uint32_t I2C_EVENT);
 /*
  ===============================================================================
-                          2. Advanced state monitoring
+                          2. Advanced state Monitoring
  ===============================================================================
  */
 uint32_t I2C_GetLastEvent(I2C_TypeDef* I2Cx);
 /*
  ===============================================================================
-                          3. Flag-based state monitoring
+                          3. Flag-based state Monitoring
  ===============================================================================
  */
 FlagStatus I2C_GetFlagStatus(I2C_TypeDef* I2Cx, uint32_t I2C_FLAG);

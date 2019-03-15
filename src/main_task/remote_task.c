@@ -178,7 +178,6 @@ void RequestFinishFrictionSpeedUp(void){
 
 void GimbalAngleLimit(void){
     VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN + 5.0f, PITCH_MAX-5.0f);
-//    VAL_LIMIT(Gimbal_Target.yaw_angle_target, 177.0f-YAW_MAX, 177.0f+YAW_MAX);
 }
 
 void RemoteDataProcess(uint8_t *pData){
@@ -209,8 +208,8 @@ void RemoteDataProcess(uint8_t *pData){
                 
                 Gimbal_Target.pitch_angle_target += (float)(RC_CtrlData.rc.ch3 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
                                                     * STICK_TO_PITCH_ANGLE_INC_FACT;
-                Gimbal_Target.yaw_angle_target   += (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
-                                                    * STICK_TO_YAW_ANGLE_INC_FACT;
+//                Gimbal_Target.yaw_angle_target   += (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
+//                                                    * STICK_TO_YAW_ANGLE_INC_FACT;
 
                 if( RC_CtrlData.rc.s1 == 1 ){
                     SetFrictionWheelSpeed(1000);

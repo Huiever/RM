@@ -3,7 +3,7 @@
 
 #include "sys.h"
 
-#define	SPI_CS PFout(6)
+#define    SPI_CS PFout(6)
 
 void SPI5_Init(void);
 void SPI_SetSpeed(u8 SpeedSet);

@@ -1,22 +1,22 @@
 #include "sys.h"  
  
 __asm void WFI_SET(void){
-	WFI;		  
+    WFI;          
 }
 
 __asm void INTX_DISABLE(void){
-	CPSID   I
-	BX      LR	  
+    CPSID   I
+    BX      LR      
 }
 
 __asm void INTX_ENABLE(void){
-	CPSIE   I
-	BX      LR  
+    CPSIE   I
+    BX      LR  
 }
 
 __asm void MSR_MSP(u32 addr) {
-	MSR MSP, r0
-	BX r14
+    MSR MSP, r0
+    BX r14
 }
 
 

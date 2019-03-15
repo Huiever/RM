@@ -1,12 +1,12 @@
 #ifndef __SYS_H
-#define __SYS_H	 
+#define __SYS_H     
 #include "stm32f4xx.h" 
 
 //0,不支持ucos
 //1,支持ucos
-#define SYSTEM_SUPPORT_OS		0		//定义系统文件夹是否支持UCOS
-																	    
-	 
+#define SYSTEM_SUPPORT_OS        0        //定义系统文件夹是否支持UCOS
+                                                                        
+     
 //位带操作,实现51类似的GPIO控制功能
 //具体实现思想,参考<<CM3权威指南>>第五章(87页~92页).M4同M3类似,只是寄存器地址变了.
 //IO口操作宏定义
@@ -64,10 +64,10 @@
 #define PIin(n)    BIT_ADDR(GPIOI_IDR_Addr,n)  //输入
 
 //以下为汇编函数
-void WFI_SET(void);		//执行WFI指令
+void WFI_SET(void);        //执行WFI指令
 void INTX_DISABLE(void);//关闭所有中断
-void INTX_ENABLE(void);	//开启所有中断
-void MSR_MSP(u32 addr);	//设置堆栈地址 
+void INTX_ENABLE(void);    //开启所有中断
+void MSR_MSP(u32 addr);    //设置堆栈地址 
 #endif
 
 

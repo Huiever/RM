@@ -10,14 +10,13 @@
 //用户直接在这里输入要执行的函数名及其查找串
 struct _m_usmart_nametab usmart_nametab[]=
 {
-#if USMART_USE_WRFUNS==1     //如果使能了读写操作
-    (void*)read_addr,"u32 read_addr(u32 addr)",
-    (void*)write_addr,"void write_addr(u32 addr,u32 val)",
-#endif
-    (void*)delay_ms,"void delay_ms(u16 nms)",
-    (void*)delay_us,"void delay_us(u32 nus)",
-    (void*)SetGimbalYawPID,"void SetGimbalYawPID(float v_kp, float v_ki, float v_kd, float p_kp, float p_ki, float p_kd)",
-    (void*)SetGimbalPitPID,"void SetGimbalPitPID(float v_kp, float v_ki, float v_kd, float p_kp, float p_ki, float p_kd)"
+    (void*)GMP_PID_PLUS,"void GMP_PID_PLUS(int x,int y);",
+    (void*)GMP_PID_MIN,"void GMP_PID_MIN(int x,int y);",
+    (void*)GMY_PID_PLUS,"void GMY_PID_PLUS(int x,int y);",
+    (void*)GMY_PID_MIN,"void GMY_PID_MIN(int x,int y);",
+    (void*)RAMMER_PID_PLUS,"void RAMMER_PID_PLUS(int x,int y);",
+    (void*)RAMMER_PID_MIN,"void RAMMER_PID_MIN(int x,int y);"
+        
 };
 ///////////////////////////////////END///////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////

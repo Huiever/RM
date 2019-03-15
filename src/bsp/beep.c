@@ -53,23 +53,23 @@ void Sing(Sound_tone_e tone){
 }
 
 void Sing_Startup_music(void){
-	int index = 0;
-	while(index < Startup_Success_music_len){
+    int index = 0;
+    while(index < Startup_Success_music_len){
     Sing(Mavic_Startup_music[index++]);
     delay_ms(200);
-	}
+    }
 }
 
 void Sing_bad_case(void){
-	while(1){
+    while(1){
         Sing(Mi3M);
         delay_ms(1000);
         Sing(Silent);
         delay_ms(1000);
-	}
+    }
 }
 
 void BEEP_Init(void){
-	BEEP_Configuration();
-	Sing_Startup_music();
+    BEEP_Configuration();
+    Sing_Startup_music();
 }

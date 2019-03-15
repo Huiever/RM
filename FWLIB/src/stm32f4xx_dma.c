@@ -50,7 +50,7 @@
           driver (ie. SPI_DMACmd for SPI peripheral).
           Once the Stream is enabled, it is not possible to modify its configuration
           unless the stream is stopped and disabled.
-          After enabling the Stream, it is advised to monitor the EN bit status using
+          After enabling the Stream, it is advised to Monitor the EN bit status using
           the function DMA_GetCmdStatus(). In case of configuration errors or bus errors
           this bit will remain reset and all transfers on this Stream will remain on hold.      
   
@@ -74,7 +74,7 @@
       (#) Optionally, if Circular mode and Double Buffer mode are enabled, you can modify
           the Memory Addresses using the function DMA_MemoryTargetConfig(). Make sure that
           the Memory Address to be modified is not the one currently in use by DMA Stream.
-          This condition can be monitored using the function DMA_GetCurrentMemoryTarget().
+          This condition can be Monitored using the function DMA_GetCurrentMemoryTarget().
                 
       (#) Optionally, Pause-Resume operations may be performed:
           The DMA_Cmd() function may be used to perform Pause-Resume operation. 
@@ -873,11 +873,11 @@ uint32_t DMA_GetCurrentMemoryTarget(DMA_Stream_TypeDef* DMAy_Streamx)
           If a Stream is disabled while a data transfer is ongoing, the current 
           data will be transferred and the Stream will be effectively disabled 
           only after this data transfer completion.
-          To monitor this state it is possible to use the following function:
+          To Monitor this state it is possible to use the following function:
         (++) FunctionalState DMA_GetCmdStatus(DMA_Stream_TypeDef* DMAy_Streamx); 
  
       (#) FIFO Status:
-          It is possible to monitor the FIFO status when a transfer is ongoing 
+          It is possible to Monitor the FIFO status when a transfer is ongoing 
           using the following function:
         (++) uint32_t DMA_GetFIFOStatus(DMA_Stream_TypeDef* DMAy_Streamx); 
  

@@ -32,7 +32,7 @@ void Gun_Configuration(void){
   TIM_OC2Init(TIM5,&oc);
   TIM_OC1PreloadConfig(TIM5,TIM_OCPreload_Enable);
   TIM_OC2PreloadConfig(TIM5,TIM_OCPreload_Enable);           
-  TIM_ARRPreloadConfig(TIM5,ENABLE);		
+  TIM_ARRPreloadConfig(TIM5,ENABLE);        
   TIM_Cmd(TIM5,ENABLE);
 }
 

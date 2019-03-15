@@ -3,7 +3,7 @@
 
 #include "sys.h" 
 
-#define KEY	PBin(2)
+#define KEY    PBin(2)
 
 void KEY_Configuration(void);
 void Key_Touch(void);

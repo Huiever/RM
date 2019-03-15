@@ -1,9 +1,9 @@
 #ifndef __USMART_STR_H
-#define __USMART_STR_H	 
+#define __USMART_STR_H     
 #include "stm32f4xx.h"
-//////////////////////////////////////////////////////////////////////////////////	 
+//////////////////////////////////////////////////////////////////////////////////     
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
-//ALIENTEK STM32开发板	   
+//ALIENTEK STM32开发板       
 //正点原子@ALIENTEK
 //技术论坛:www.openedv.com 
 //版本：V3.1
@@ -19,14 +19,14 @@
 //1,修改了list指令,打印函数的完整表达式.
 //2,增加了id指令,打印每个函数的入口地址.
 //3,修改了参数匹配,支持函数参数的调用(输入入口地址).
-//4,增加了函数名长度宏定义.	
-//V2.1 20110707		 
+//4,增加了函数名长度宏定义.    
+//V2.1 20110707         
 //1,增加dec,hex两个指令,用于设置参数显示进制,及执行进制转换.
 //注:当dec,hex不带参数的时候,即设定显示参数进制.当后跟参数的时候,即执行进制转换.
 //如:"dec 0XFF" 则会将0XFF转为255,由串口返回.
-//如:"hex 100" 	则会将100转为0X64,由串口返回
+//如:"hex 100"     则会将100转为0X64,由串口返回
 //2,新增usmart_get_cmdname函数,用于获取指令名字.
-//V2.2 20110726	
+//V2.2 20110726    
 //1,修正了void类型参数的参数统计错误.
 //2,修改数据显示格式默认为16进制.
 //V2.3 20110815
@@ -42,7 +42,7 @@
 //V2.6 20111009
 //1,增加了read_addr和write_addr两个函数.可以利用这两个函数读写内部任意地址(必须是有效地址).更加方便调试.
 //2,read_addr和write_addr两个函数可以通过设置USMART_USE_WRFUNS为来使能和关闭.
-//3,修改了usmart_strcmp,使其规范化.			  
+//3,修改了usmart_strcmp,使其规范化.              
 //V2.7 20111024
 //1,修正了返回值16进制显示时不换行的bug.
 //2,增加了函数是否有返回值的判断,如果没有返回值,则不会显示.有返回值时才显示其返回值.
@@ -61,14 +61,14 @@
 /////////////////////////////////////////////////////////////////////////////////////
  
  
-u8 usmart_get_parmpos(u8 num);						//得到某个参数在参数列里面的起始位置
-u8 usmart_strcmp(u8*str1,u8 *str2);					//对比两个字符串是否相等
-u32 usmart_pow(u8 m,u8 n);							//M^N次方
-u8 usmart_str2num(u8*str,u32 *res);					//字符串转为数字
+u8 usmart_get_parmpos(u8 num);                        //得到某个参数在参数列里面的起始位置
+u8 usmart_strcmp(u8*str1,u8 *str2);                    //对比两个字符串是否相等
+u32 usmart_pow(u8 m,u8 n);                            //M^N次方
+u8 usmart_str2num(u8*str,u32 *res);                    //字符串转为数字
 u8 usmart_get_cmdname(u8*str,u8*cmdname,u8 *nlen,u8 maxlen);//从str中得到指令名,并返回指令长度
-u8 usmart_get_fname(u8*str,u8*fname,u8 *pnum,u8 *rval);		//从str中得到函数名
-u8 usmart_get_aparm(u8 *str,u8 *fparm,u8 *ptype); 	//从str中得到一个函数参数
-u8 usmart_get_fparam(u8*str,u8 *parn);  			//得到str中所有的函数参数.
+u8 usmart_get_fname(u8*str,u8*fname,u8 *pnum,u8 *rval);        //从str中得到函数名
+u8 usmart_get_aparm(u8 *str,u8 *fparm,u8 *ptype);     //从str中得到一个函数参数
+u8 usmart_get_fparam(u8*str,u8 *parn);              //得到str中所有的函数参数.
 #endif
 
 
