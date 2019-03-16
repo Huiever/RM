@@ -14,6 +14,15 @@
 #define BOARD_DOWN (1)
 #define IST8310
 
+static volatile float integralFBx = 0.0f, integralFBy = 0.0f, integralFBz = 0.0f; // integral error terms scaled by Ki
+#define sampleFreq 200.0f // sample frequency in Hz
+#define twoKpDef (20.0f * 0.5f)   // 2 * proportional gain
+#define twoKiDef (2.0f * 0.005f) // 2 * integral gain
+//---------------------------------------------------------------------------------------------------
+// Variable definitions
+static volatile float twoKp = twoKpDef;                                           // 2 * proportional gain (Kp)
+static volatile float twoKi = twoKiDef;                                           // 2 * integral gain (Ki)
+
 #define Kp IMU_Kp                                            /* 
                                                               * proportional gain governs rate of 
                                                               * convergence to accelerometer/magnetometer 
@@ -43,7 +52,7 @@ imu_t imu = {
 
 int32_t MPU6500_FIFO[6][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平均值
 int16_t IST8310_FIFO[3][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平均值 
-                                                                        //注：磁传感器的采样频率慢，所以单独列出
+                                      //注：磁传感器的采样频率慢，所以单独列出
 uint8_t MPU_id = 0x70;
 
 void mpu_offset_call(void);
@@ -205,7 +214,7 @@ uint8_t MPU6500_Init(void){
     {MPU6500_PWR_MGMT_1,    0x03},      // Clock Source - Gyro-Z
     {MPU6500_PWR_MGMT_2,    0x00},      // Enable Acc & Gyro
     {MPU6500_CONFIG,        0x04},      // LPF 98Hz
-    {MPU6500_GYRO_CONFIG,   0x18},      // +-2000dps
+    {MPU6500_GYRO_CONFIG,   0x10},      // +-1000dps
     {MPU6500_ACCEL_CONFIG,  0x00},      // +-2G
     {MPU6500_ACCEL_CONFIG_2,0x02},      // enable LowPassFilter  Set Acc LPF
     {MPU6500_USER_CTRL,     0x20},      // Enable AUX
@@ -280,7 +289,7 @@ void imu_init(void){
 //    while(IST8310_Init()){
 //        printf("IST8310 init error！");
 //    }
-    
+    IST8310_Init();
     mpu_offset_call();
     init_quaternion();
 }
@@ -407,13 +416,13 @@ void IMU_Get_Raw_Data(void)
     imu.rip.temp = imu.raw.temp * MPU6500_TEMPERATURE_FACTOR + MPU6500_TEMPERATURE_OFFSET;
 
 //unit:m/s2
-    imu.rip.ax = (float)(imu.raw.ax * 9.8 / 16384);
-    imu.rip.ay = (float)(imu.raw.ay * 9.8 / 16384);
-    imu.rip.az = (float)(imu.raw.az * 9.8 / 16384);
+    imu.rip.ax = (float)(imu.raw.ax * 9.80665f / 16384.0f);
+    imu.rip.ay = (float)(imu.raw.ay * 9.80665f / 16384.0f);
+    imu.rip.az = (float)(imu.raw.az * 9.80665f / 16384.0f);
 
-//    imu.rip.ax = (float)(imu.raw.ax / 16384);
-//    imu.rip.ay = (float)(imu.raw.ay / 16384);
-//    imu.rip.az = (float)(imu.raw.az / 16384);
+//    imu.rip.ax = (float)(imu.raw.ax / 16384.0f);
+//    imu.rip.ay = (float)(imu.raw.ay / 16384.0f);
+//    imu.rip.az = (float)(imu.raw.az / 16384.0f);
 
     static uint8_t updata_count=0;
     //加速度计低通滤波
@@ -451,13 +460,14 @@ void IMU_Get_Raw_Data(void)
     imu.rip.ay = accel_fliter_3[1];
     imu.rip.az = accel_fliter_3[2];
     
-    /* +-1000dps -> rad/s */
-//    imu.rip.gx = (float)(imu.raw.gx /32.8f /57.3f);
-//    imu.rip.gy = (float)(imu.raw.gy /32.8f /57.3f);
-//    imu.rip.gz = (float)(imu.raw.gz /32.8f /57.3f);
-    imu.rip.gx = (float)(imu.raw.gx /16.4f);
-    imu.rip.gy = (float)(imu.raw.gy /16.4f);
-    imu.rip.gz = (float)(imu.raw.gz /16.4f);
+/* +-1000dps -> rad/s */
+    imu.rip.gx = (float)(imu.raw.gx /32.8f /57.3f);
+    imu.rip.gy = (float)(imu.raw.gy /32.8f /57.3f);
+    imu.rip.gz = (float)(imu.raw.gz /32.8f /57.3f);
+/* +-2000dps -> rad/s */
+//    imu.rip.gx = (float)(imu.raw.gx /16.4f /57.3f);
+//    imu.rip.gy = (float)(imu.raw.gy /16.4f /57.3f);
+//    imu.rip.gz = (float)(imu.raw.gz /16.4f /57.3f);
 }
 
 void mpu_offset_call(void){
@@ -486,12 +496,81 @@ void mpu_offset_call(void){
     imu.offset.ay = imu.offset.ay / 300;
     imu.offset.az = imu.offset.az / 300;
     imu.offset.gx = imu.offset.gx / 300;
-    imu.offset.gy = imu.offset.gx / 300;
+    imu.offset.gy = imu.offset.gy / 300;
     imu.offset.gz = imu.offset.gz / 300;
     //用来初始化四元数
     imu.raw.mx = (int16_t)IST8310_FIFO[0][10];
     imu.raw.my = (int16_t)IST8310_FIFO[1][10];
     imu.raw.mz = (int16_t)IST8310_FIFO[2][10];
+}
+void mahony_ahrs_updateIMU(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz)
+{
+  float recipNorm;
+  float halfvx, halfvy, halfvz;
+  float halfex, halfey, halfez;
+  float qa, qb, qc;
+
+  // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
+  if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)))
+  {
+
+    // Normalise accelerometer measurement
+    recipNorm = invSqrt(ax * ax + ay * ay + az * az);
+    ax *= recipNorm;
+    ay *= recipNorm;
+    az *= recipNorm;
+
+    // Estimated direction of gravity and vector perpendicular to magnetic flux
+    halfvx = q1 * q3 - q0 * q2;
+    halfvy = q0 * q1 + q2 * q3;
+    halfvz = q0 * q0 - 0.5f + q3 * q3;
+
+    // Error is sum of cross product between estimated and measured direction of gravity
+    halfex = (ay * halfvz - az * halfvy);
+    halfey = (az * halfvx - ax * halfvz);
+    halfez = (ax * halfvy - ay * halfvx);
+
+    // Compute and apply integral feedback if enabled
+    if (twoKi > 0.0f)
+    {
+      integralFBx += twoKi * halfex * (1.0f / sampleFreq); // integral error scaled by Ki
+      integralFBy += twoKi * halfey * (1.0f / sampleFreq);
+      integralFBz += twoKi * halfez * (1.0f / sampleFreq);
+      gx += integralFBx; // apply integral feedback
+      gy += integralFBy;
+      gz += integralFBz;
+    }
+    else
+    {
+      integralFBx = 0.0f; // prevent integral windup
+      integralFBy = 0.0f;
+      integralFBz = 0.0f;
+    }
+
+    // Apply proportional feedback
+    gx += twoKp * halfex;
+    gy += twoKp * halfey;
+    gz += twoKp * halfez;
+  }
+
+  // Integrate rate of change of quaternion
+  gx *= (0.5f * (1.0f / sampleFreq)); // pre-multiply common factors
+  gy *= (0.5f * (1.0f / sampleFreq));
+  gz *= (0.5f * (1.0f / sampleFreq));
+  qa = q0;
+  qb = q1;
+  qc = q2;
+  q0 += (-qb * gx - qc * gy - q3 * gz);
+  q1 += (qa * gx + qc * gz - q3 * gy);
+  q2 += (qa * gy - qb * gz + q3 * gx);
+  q3 += (qa * gz + qb * gy - qc * gx);
+
+  // Normalise quaternion
+  recipNorm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+  q0 *= recipNorm;
+  q1 *= recipNorm;
+  q2 *= recipNorm;
+  q3 *= recipNorm;
 }
 
 void init_quaternion(void){
@@ -751,237 +830,7 @@ void IMU_AHRSupdate(void){
     q3 = tempq3 * norm;
 }
 
-// =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  = 
-// MahonyAHRS.c
-// =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  = 
-//
-// Madgwick's implementation of Mayhony's AHRS algorithm.
-// See: http://www.x-io.co.uk/node/8#open_source_ahrs_and_imu_algorithms
-//
-// Date            Author            Notes
-// 29/09/2011    SOH Madgwick    Initial release
-// 02/10/2011    SOH Madgwick    Optimised for reduced CPU load
-//
-// =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  = 
 
-//---------------------------------------------------------------------------------------------------
-// Header files
-
-
-#include <math.h>
-
-//---------------------------------------------------------------------------------------------------
-// Definitions
-
-#define sampleFreq    100.0f            // sample frequency in Hz
-#define twoKpDef    (100.0f * 0.5f)    // 2 * proportional gain
-#define twoKiDef    0    // 2 * integral gain
-
-//---------------------------------------------------------------------------------------------------
-// Variable definitions
-
-volatile float twoKp = twoKpDef;                                            // 2 * proportional gain (Kp)
-volatile float twoKi = twoKiDef;                                            // 2 * integral gain (Ki)
-//volatile float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;                    // quaternion of sensor frame relative to auxiliary frame
-volatile float integralFBx = 0.0f,  integralFBy = 0.0f, integralFBz = 0.0f;    // integral error terms scaled by Ki
-
-//---------------------------------------------------------------------------------------------------
-// IMU algorithm update
-
-void MahonyAHRSupdateIMU(float gx, float gy, float gz, float ax, float ay, float az) {
-    float recipNorm;
-    float halfvx, halfvy, halfvz;
-    float halfex, halfey, halfez;
-    float qa, qb, qc;
-
-    // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-    if(!((ax  ==  0.0f) && (ay  ==  0.0f) && (az  ==  0.0f))) {
-
-        // Normalise accelerometer measurement
-        recipNorm = invSqrt(ax * ax + ay * ay + az * az);
-        ax *=  recipNorm;
-        ay *=  recipNorm;
-        az *=  recipNorm;        
-
-        // Estimated direction of gravity and vector perpendicular to magnetic flux
-        halfvx = q1 * q3 - q0 * q2;
-        halfvy = q0 * q1 + q2 * q3;
-        halfvz = q0 * q0 - 0.5f + q3 * q3;
-    
-        // Error is sum of cross product between estimated and measured direction of gravity
-        halfex = (ay * halfvz - az * halfvy);
-        halfey = (az * halfvx - ax * halfvz);
-        halfez = (ax * halfvy - ay * halfvx);
-
-        // Compute and apply integral feedback if enabled
-        if(twoKi > 0.0f) {
-            integralFBx +=  twoKi * halfex * (1.0f / sampleFreq);    // integral error scaled by Ki
-            integralFBy +=  twoKi * halfey * (1.0f / sampleFreq);
-            integralFBz +=  twoKi * halfez * (1.0f / sampleFreq);
-            gx +=  integralFBx;    // apply integral feedback
-            gy +=  integralFBy;
-            gz +=  integralFBz;
-        }
-        else {
-            integralFBx = 0.0f;    // prevent integral windup
-            integralFBy = 0.0f;
-            integralFBz = 0.0f;
-        }
-
-        // Apply proportional feedback
-        gx +=  twoKp * halfex;
-        gy +=  twoKp * halfey;
-        gz +=  twoKp * halfez;
-    }
-    
-    // Integrate rate of change of quaternion
-    gx *=  (0.5f * (1.0f / sampleFreq));        // pre-multiply common factors
-    gy *=  (0.5f * (1.0f / sampleFreq));
-    gz *=  (0.5f * (1.0f / sampleFreq));
-    qa = q0;
-    qb = q1;
-    qc = q2;
-    q0 +=  (-qb * gx - qc * gy - q3 * gz);
-    q1 +=  (qa * gx + qc * gz - q3 * gy);
-    q2 +=  (qa * gy - qb * gz + q3 * gx);
-    q3 +=  (qa * gz + qb * gy - qc * gx); 
-    
-    // Normalise quaternion
-    recipNorm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-    q0 *=  recipNorm;
-    q1 *=  recipNorm;
-    q2 *=  recipNorm;
-    q3 *=  recipNorm;
-}
-
-//---------------------------------------------------------------------------------------------------
-// Fast inverse square-root
-// See: http://en.wikipedia.org/wiki/Fast_inverse_square_root
-
-// =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  = 
-// END OF CODE
-// =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  = 
-
-// parameters for 6 DoF sensor fusion calculations
-#define PI = 3.14159265358979323846f;
-#define GyroMeasError = 1.04719755119;     // gyroscope measurement error in rads/s (start at 60 deg/s), then reduce after ~10 s to 3
-volatile float beta = 0.9068996821;  // compute beta
-#define GyroMeasDrift = PI * (1.0f / 180.0f);      // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
-volatile float zeta = 0.0151149947;  // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
-volatile float deltat = 0.0f;                              // integration interval for both filter schemes
-volatile int lastUpdate = 0, firstUpdate = 0, Now = 0;     // used to calculate integration interval                               // used to calculate integration interval
-
-// Implementation of Sebastian Madgwick's "...efficient orientation filter for... inertial/magnetic sensor arrays"
-// (see http://www.x-io.co.uk/category/open-source/ for examples and more details)
-// which fuses acceleration and rotation rate to produce a quaternion-based estimate of relative
-// device orientation -- which can be converted to yaw, pitch, and roll. Useful for stabilizing quadcopters, etc.
-// The performance of the orientation filter is at least as good as conventional Kalman-based filtering algorithms
-// but is much less computationally intensive---it can be performed on a 3.3 V Pro Mini operating at 8 MHz!
-void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz)
-{
-    float norm;                                               // vector norm
-    float f1, f2, f3;                                         // objective funcyion elements
-    float J_11or24, J_12or23, J_13or22, J_14or21, J_32, J_33; // objective function Jacobian elements
-    float qDot1, qDot2, qDot3, qDot4;
-    float hatDot1, hatDot2, hatDot3, hatDot4;
-    float gerrx, gerry, gerrz, gbiasx, gbiasy, gbiasz;  // gyro bias error
-
-    // Auxiliary variables to avoid repeated arithmetic
-    float _halfq1 = 0.5f * q0;
-    float _halfq2 = 0.5f * q1;
-    float _halfq3 = 0.5f * q2;
-    float _halfq4 = 0.5f * q3;
-    float _2q1 = 2.0f * q0;
-    float _2q2 = 2.0f * q1;
-    float _2q3 = 2.0f * q2;
-    float _2q4 = 2.0f * q3;
-//            float _2q1q3 = 2.0f * q0 * q2;
-//            float _2q3q4 = 2.0f * q2 * q3;
-
-    Now = Get_Time_Micros(); //ms
-    deltat = (float)((Now - lastUpdate)/1000.0f) ; // set integration time by time elapsed since last filter update
-    lastUpdate = Now;
-
-    if(lastUpdate - firstUpdate > 10000.0f) {
-     beta = 0.04;  // decrease filter gain after stabilized
-     zeta = 0.015; // increasey bias drift gain after stabilized
-    }
-
-
-    // Normalise accelerometer measurement
-    norm = sqrt(ax * ax + ay * ay + az * az);
-    if (norm == 0.0f) return; // handle NaN
-    norm = 1.0f/norm;
-    ax *= norm;
-    ay *= norm;
-    az *= norm;
-    
-    // Compute the objective function and Jacobian
-    f1 = _2q2 * q3 - _2q1 * q2 - ax;
-    f2 = _2q1 * q1 + _2q3 * q3 - ay;
-    f3 = 1.0f - _2q2 * q1 - _2q3 * q2 - az;
-    J_11or24 = _2q3;
-    J_12or23 = _2q4;
-    J_13or22 = _2q1;
-    J_14or21 = _2q2;
-    J_32 = 2.0f * J_14or21;
-    J_33 = 2.0f * J_11or24;
-  
-    // Compute the gradient (matrix multiplication)
-    hatDot1 = J_14or21 * f2 - J_11or24 * f1;
-    hatDot2 = J_12or23 * f1 + J_13or22 * f2 - J_32 * f3;
-    hatDot3 = J_12or23 * f2 - J_33 *f3 - J_13or22 * f1;
-    hatDot4 = J_14or21 * f1 + J_11or24 * f2;
-    
-    // Normalize the gradient
-    norm = sqrt(hatDot1 * hatDot1 + hatDot2 * hatDot2 + hatDot3 * hatDot3 + hatDot4 * hatDot4);
-    hatDot1 /= norm;
-    hatDot2 /= norm;
-    hatDot3 /= norm;
-    hatDot4 /= norm;
-    
-    // Compute estimated gyroscope biases
-    gerrx = _2q1 * hatDot2 - _2q2 * hatDot1 - _2q3 * hatDot4 + _2q4 * hatDot3;
-    gerry = _2q1 * hatDot3 + _2q2 * hatDot4 - _2q3 * hatDot1 - _2q4 * hatDot2;
-    gerrz = _2q1 * hatDot4 - _2q2 * hatDot3 + _2q3 * hatDot2 - _2q4 * hatDot1;
-    
-    // Compute and remove gyroscope biases
-    gbiasx += gerrx * deltat * zeta;
-    gbiasy += gerry * deltat * zeta;
-    gbiasz += gerrz * deltat * zeta;
-//           gx -= gbiasx;
-//           gy -= gbiasy;
-//           gz -= gbiasz;
-    
-    // Compute the quaternion derivative
-    qDot1 = -_halfq2 * gx - _halfq3 * gy - _halfq4 * gz;
-    qDot2 =  _halfq1 * gx + _halfq3 * gz - _halfq4 * gy;
-    qDot3 =  _halfq1 * gy - _halfq2 * gz + _halfq4 * gx;
-    qDot4 =  _halfq1 * gz + _halfq2 * gy - _halfq3 * gx;
-
-    // Compute then integrate estimated quaternion derivative
-    q0 += (qDot1 -(beta * hatDot1)) * deltat;
-    q1 += (qDot2 -(beta * hatDot2)) * deltat;
-    q2 += (qDot3 -(beta * hatDot3)) * deltat;
-    q3 += (qDot4 -(beta * hatDot4)) * deltat;
-
-    // Normalize the quaternion
-    norm = sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);    // normalise quaternion
-    norm = 1.0f/norm;
-    q0 = q0 * norm;
-    q1 = q1 * norm;
-    q2 = q2 * norm;
-    q3 = q3 * norm;
-    
-}
-
-
-/**
-    * @brief  update imu attitude
-  * @param  
-    * @retval 
-  * @usage  call in main() function
-    */
 void IMU_getYawPitchRoll(void)
 {
     volatile static float yaw_temp = 0,last_yaw_temp = 0;
@@ -1072,34 +921,21 @@ float get_pit_angle(void){
 }
 
 float get_imu_wx(void){
-  return imu.rip.gx;
+  return imu.rip.gx * 57.3f;
 }
 
 float get_imu_wy(void){
-  return imu.rip.gy;
+  return imu.rip.gy * 57.3f;
 }
 
 float get_imu_wz(void){
-  return imu.rip.gz;
-}
-
-int16_t get_mpu_gx(void){
-  return imu.raw.gx;
-}
-
-int16_t get_mpu_gy(void){
-  return imu.raw.gy;
-}
-
-int16_t get_mpu_gz(void){
-  return imu.raw.gz;
+  return imu.rip.gz * 57.3f;
 }
 
 void imu_main(void){
     IMU_Get_Raw_Data();
+//    mahony_ahrs_updateIMU(imu.rip.gx, imu.rip.gy, imu.rip.gz, imu.rip.ax, imu.rip.ay, imu.rip.az, imu.raw.mx, imu.raw.my, imu.raw.mz);
 //    IMU_AHRSupdate();
-//    MahonyAHRSupdateIMU(imu.rip.gx,imu.rip.gy,imu.rip.gz,imu.rip.ax,imu.rip.ay,imu.rip.az);
-//    MadgwickQuaternionUpdate(imu.rip.ax,imu.rip.ay,imu.rip.az, imu.rip.gx,imu.rip.gy,imu.rip.gz);
 //    IMU_temp_Control(imu.rip.temp);
 //    IMU_getYawPitchRoll();
     delay_ms(5);
@@ -1108,12 +944,8 @@ void imu_main(void){
 //    printf("%8.3lf,%8.3lf,%8.3lf\r\n", imu.rip.yaw, imu.rip.pit,imu.rip.yaw - 1.74*fabs(imu.rip.pit));
     delay_ms(5);
 #endif
-#if Monitor_IMU_Accel == 1
-    printf("wx:%8.3lf  wy:%8.3lf  wz:%8.3lf\r\n", imu.rip.gx, imu.rip.gy, imu.rip.gz);
-    delay_ms(5);
-#endif
-#if Monitor_IMU_Accel_Raw == 1
-    printf("raw_gx:%8d raw_gy:%8d  raw_gz:%8d\r\n", imu.raw.gx, imu.raw.gy, imu.raw.gz);
+#if Monitor_IMU_Gyro == 1
+    printf("wx:%8.3lf  wy:%8.3lf  wz:%8.3lf\r\n", get_imu_wx(), get_imu_wy(), get_imu_wz());
     delay_ms(5);
 #endif
 #if Monitor_IMU_Mag == 1

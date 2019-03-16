@@ -205,12 +205,12 @@ void RemoteDataProcess(uint8_t *pData){
             SetControlMode(&RC_CtrlData.rc);
             if(GetWorkState() == CONTROL_STATE){
                 ChassisSpeed_Target = (RC_CtrlData.rc.ch1 - 1024) * 10;
-                
+#if DEBUG_YAW_PID == 0 && DEBUG_PITCH_PID == 0
                 Gimbal_Target.pitch_angle_target += (float)(RC_CtrlData.rc.ch3 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
                                                     * STICK_TO_PITCH_ANGLE_INC_FACT;
-//                Gimbal_Target.yaw_angle_target   += (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
-//                                                    * STICK_TO_YAW_ANGLE_INC_FACT;
-
+                Gimbal_Target.yaw_angle_target   += (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
+                                                    * STICK_TO_YAW_ANGLE_INC_FACT;
+#endif
                 if( RC_CtrlData.rc.s1 == 1 ){
                     SetFrictionWheelSpeed(1000);
                     Set_Flag_AutoShoot(0);

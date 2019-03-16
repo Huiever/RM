@@ -46,7 +46,7 @@ void Control_Task(void){
         ShootControlLoop();
     }
     else{
-        //Send_Gimbal_Info(GetUpperMonitorOnline(),Is_Control_State(),Get_ChassisSpeed_Target());
+        Send_Gimbal_Info(GetUpperMonitorOnline(),Is_Control_State(),Get_ChassisSpeed_Target());
     }
 }
 
@@ -115,6 +115,7 @@ void GimbalYawControlModeSwitch(void){
     static float    YawAngleSave  = 0.0f;
     static uint8_t  Flag_Cruise_Reverse = 0;
     static int16_t  Cruise_Time_Between = 0;
+    static uint8_t  pitch_dowm_flag = 0;
     switch(GetWorkState()){
         case PREPARE_STATE:{
             GMYPositionPID.ref = 177.0f;
@@ -129,20 +130,43 @@ void GimbalYawControlModeSwitch(void){
                 RunAwayFlag = 0;
                 ControlFlag = 0;
             }
-//            Cruise_Time_Between++;
-//            if(Cruise_Time_Between > 10){
-//                Gimbal_Target.yaw_angle_target = Gimbal_Target.yaw_angle_target + 2.0f;
-//                Cruise_Time_Between=0;
-//            }
+
+#if DEBUG_YAW_PID == 0
+            Cruise_Time_Between++;
+            if(Cruise_Time_Between > 10){
+                Gimbal_Target.yaw_angle_target += GIMBAL_YAW_CRUISE_DELTA;
+                
+                if(pitch_dowm_flag == 1){
+                    Gimbal_Target.pitch_angle_target -= GIMBAL_PITCH_CRUISE_DELTA;
+                }
+                else{
+                    Gimbal_Target.pitch_angle_target += GIMBAL_PITCH_CRUISE_DELTA;
+                }
+                
+                if(Gimbal_Target.pitch_angle_target > PITCH_MAX-5){
+                    pitch_dowm_flag = 1;
+                }
+                if(Gimbal_Target.pitch_angle_target < PITCH_MIN+5){
+                    pitch_dowm_flag = 0;
+                }
+
+                Cruise_Time_Between=0;
+            }
+
+#endif
+
+#if DEBUG_YAW_PID == 1
             static int i=0;
             if(i==4000){
-            Gimbal_Target.yaw_angle_target += 50;
+                Gimbal_Target.yaw_angle_target += 50;
             }
             else if(i>=8000){
-            Gimbal_Target.yaw_angle_target -= 50;
-            i=0;
+                Gimbal_Target.yaw_angle_target -= 50;
+                i=0;
             }
             i++;
+#endif
+            
             GimbalAngleLimit();
             GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
             GMYPositionPID.fdb = GMYawEncoder.ecd_angle;
@@ -171,6 +195,7 @@ void GimbalYawControlModeSwitch(void){
             
         }break;
         case CONTROL_STATE:{
+#if DEBUG_YAW_PID == 1
             static int i=0;
             if(i==5000){
                 Gimbal_Target.yaw_angle_target += 50;
@@ -180,6 +205,7 @@ void GimbalYawControlModeSwitch(void){
                 i=0;
             }
             i++;
+#endif
             if(ControlFlag == 0){
                 Gimbal_Target.yaw_angle_target = YawAngleSave;
                 ControlFlag = 1;
@@ -195,27 +221,36 @@ void GimbalYawControlModeSwitch(void){
 }
 
 void GMPitchControlLoop(void){
-//    GMPPositionPID.kp = PITCH_POSITION_KP_DEFAULTS;
-//    GMPPositionPID.ki = PITCH_POSITION_KI_DEFAULTS;
-//    GMPPositionPID.kd = PITCH_POSITION_KD_DEFAULTS;
-//    GMPSpeedPID.kp = PITCH_SPEED_KP_DEFAULTS;
-//    GMPSpeedPID.ki = PITCH_SPEED_KI_DEFAULTS;
-//    GMPSpeedPID.kd = PITCH_SPEED_KD_DEFAULTS;
-//    static int i=0;
-//    if(i==5000){
-//        Gimbal_Target.pitch_angle_target = 10;
-//    }
-//    else if(i>=10000){
-//        Gimbal_Target.pitch_angle_target = -10;
-//        i=0;
-//    }
-//    i++;
+
+#if DEBUG_PICTH_PID == 1
+    static int i=0;
+    if(i==5000){
+        Gimbal_Target.pitch_angle_target = 10;
+    }
+    else if(i>=10000){
+        Gimbal_Target.pitch_angle_target = -10;
+        i=0;
+    }
+    i++;
+#endif
     GimbalAngleLimit();
     GMPPositionPID.ref = Gimbal_Target.pitch_angle_target;
     GMPPositionPID.fdb = GMPitchEncoder.ecd_angle * GMPitchRamp.Calc(&GMPitchRamp);
     GMPPositionPID.Calc(&GMPPositionPID);
     GMPSpeedPID.ref = GMPPositionPID.output;
-    GMPSpeedPID.fdb = get_imu_wy();
+#if DEBUG_PICTH_PID == 2
+    static int i=0;
+    if(i==2000){
+        GMPSpeedPID.ref = 10;
+    }
+    else if(i>=4000){
+        GMPSpeedPID.ref = -10;
+        i=0;
+    }
+    i++;
+#endif
+//    GMPSpeedPID.fdb = get_imu_wy();
+    GMPSpeedPID.fdb = GMPitchEncoder.diff;
     GMPSpeedPID.Calc(&GMPSpeedPID);
 }
 
@@ -255,29 +290,28 @@ void GMYawControlLoop(void){
 //            GMYSpeedPID.kd = YAW_SPEED_KD_DEFAULTS;
         }break;
     }
-
-
+    
     GMYPositionPID.Calc(&GMYPositionPID);
     GMYSpeedPID.ref = GMYPositionPID.output;
-//    GMYSpeedPID.ref = 0;
-//    static int i=0;
-//    if(i==4000){
-//        GMYSpeedPID.ref = 50;
-//    }
-//    else if(i>=8000){
-//        GMYSpeedPID.ref = -50;
-//        i=0;
-//    }
-//    i++;
     
+#if DEBUG_YAW_PID == 2
+    static int i=0;
+    if(i==4000){
+        GMYSpeedPID.ref = 50;
+    }
+    else if(i>=8000){
+        GMYSpeedPID.ref = -50;
+        i=0;
+    }
+    i++;
+#endif
+
     GMYSpeedPID.fdb = get_imu_wz();
     GMYSpeedPID.Calc(&GMYSpeedPID);
 }
 
 
 void SetGimbalMotorOutput(void){
-
-//    Set_Gimbal_Current(CAN1, -(int16_t)GMYPositionPID.output, -(int16_t)GMPPositionPID.output);
     Set_Gimbal_Current(CAN1, -(int16_t)GMYSpeedPID.output, -(int16_t)GMPSpeedPID.output);
 }
 
@@ -335,9 +369,6 @@ void ShootControlLoop(void){
 }
 
 void RammerSpeedPID( int16_t TargetSpeed){
-    RAMMERSpeedPID.kp  = RAMMER_SPEED_KP_DEFAULTS;
-    RAMMERSpeedPID.ki  = RAMMER_SPEED_KI_DEFAULTS;
-    RAMMERSpeedPID.kd  = RAMMER_SPEED_KD_DEFAULTS;
     RAMMERSpeedPID.ref = TargetSpeed;
     RAMMERSpeedPID.fdb = Rammer.speed;
     RAMMERSpeedPID.Calc(&RAMMERSpeedPID);
@@ -512,3 +543,5 @@ void RAMMER_PID_MIN(int x,int y)
     }
     Monitor_Rammer_PID();
 }
+
+

@@ -10,17 +10,20 @@
    This can change the convergence speed of the IMU output */
 #define IMU_Kp                      20.0f
 #define IMU_Ki                      0.1f
-#define ELLIPSOID_FIT               1//Õ÷«Úƒ‚∫œ
+#define ELLIPSOID_FIT               0//Õ÷«Úƒ‚∫œ
 #define AXIS_6                      1
 
 /* Choose to monitor the output of IMU */
 #define Monitor_IMU_Angle           0
-#define Monitor_IMU_Accel           0
-#define Monitor_IMU_Accel_Raw       0
+#define Monitor_IMU_Gyro            0
 #define Monitor_IMU_Mag             0
 
 /* Choose to monitor the output of remoter */
 #define Monitor_Remoter             0
+
+/* Debug pid parameters 0--null 1--position 2--speed*/
+#define DEBUG_YAW_PID               0
+#define DEBUG_PITCH_PID             0
 
 /* Monitor the encoder offset of pitch/yaw motor */
 #define Monitor_GM_Encoder          0
@@ -40,9 +43,8 @@
    So we need to check the sum of "monitors" 
      @usage: when adding a monitor macro definition,
              you must add it here. */
-#define Check_Sum                   Monitor_IMU_Angle + Monitor_IMU_Accel + \
+#define Check_Sum                   Monitor_IMU_Angle + Monitor_IMU_Gyro + \
                                     Monitor_Remoter + Monitor_GM_Encoder +  \
-                                    Monitor_rammer+Monitor_IMU_Mag+ \
-                                    Monitor_IMU_Accel_Raw
+                                    Monitor_rammer+Monitor_IMU_Mag
 
 #endif
