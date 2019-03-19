@@ -10,43 +10,29 @@
 #include "adc.h"
 #include "main.h"
 #include "pid_regulator.h"
+#include "math.h"
 
 #define BOARD_DOWN (1)
 #define IST8310
 
-static volatile float integralFBx = 0.0f, integralFBy = 0.0f, integralFBz = 0.0f; // integral error terms scaled by Ki
-#define sampleFreq 200.0f // sample frequency in Hz
-#define twoKpDef (20.0f * 0.5f)   // 2 * proportional gain
-#define twoKiDef (2.0f * 0.005f) // 2 * integral gain
 //---------------------------------------------------------------------------------------------------
 // Variable definitions
 static volatile float twoKp = twoKpDef;                                           // 2 * proportional gain (Kp)
 static volatile float twoKi = twoKiDef;                                           // 2 * integral gain (Ki)
-
-#define Kp IMU_Kp                                            /* 
-                                                              * proportional gain governs rate of 
-                                                              * convergence to accelerometer/magnetometer 
-                                                                                                                            */
-#define Ki IMU_Ki                                            /* 
-                                                              * integral gain governs rate of 
-                                                              * convergence of gyroscope biases 
-                                                                                                                             */
+static volatile float integralFBx = 0.0f, integralFBy = 0.0f, integralFBz = 0.0f; // integral error terms scaled by Ki
 volatile float        q0 = 1.0f;
 volatile float        q1 = 0.0f;
 volatile float        q2 = 0.0f;
 volatile float        q3 = 0.0f;
-volatile float        exInt, eyInt, ezInt;                   /* error integral */
+
 static volatile float gx, gy, gz, ax, ay, az, mx, my, mz;  
-volatile uint32_t     last_update, now_update;               /* Sampling cycle count, ubit ms */
 uint8_t               mpu_buff[14];                          /* buffer to save imu raw data */
 uint8_t               ist_buff[6];                           /* buffer to save IST8310 raw data */
 
                                                                                                     
 imu_t imu = {
             {0,0,0,0,0,0,0,0,0,0},       //raw
-            {0,0,0,0,0,0,
-                {-10.55f, 0.83f,11.92f,1.00f,-0.003f, -0.049f,1.021f,-0.015f,0.982f}
-            },     //offset
+            {0,0,0,0,0,0,0,0,0,},     //offset
             {0,0,0,0,0,0,0,0,0,0,0,0,0}  //rip
             };
 
@@ -55,8 +41,10 @@ int16_t IST8310_FIFO[3][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平
                                       //注：磁传感器的采样频率慢，所以单独列出
 uint8_t MPU_id = 0x70;
 
+PID_Regulator_t IMUTemperaturePID = IMU_Temperature_PID_DEFAULT;
+
 void mpu_offset_call(void);
-void init_quaternion(void);
+void init_quaternion(imu_rawdata_t const * mpudata);
 
 float invSqrt(float x) {
     float halfx = 0.5f * x;
@@ -279,9 +267,17 @@ uint8_t IST8310_Init(void){
   delay_ms(100);
   return 0;
 }
-void calibrateMPU6050(float * dest1, float * dest2);
+
+void GetIST8310_RawValues(uint8_t* buff)
+{
+    MPU6500_Read_Regs(MPU6500_EXT_SENS_DATA_00,buff,6);
+}
+
 void imu_init(void){
-    //calibrateMPU6050(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers  
+#if IMU_TEMPERATURE_CONTROL == 1
+    temperature_ADC_init();
+    TIM3_Init(MPU6500_TEMP_PWM_MAX, 1); //陀螺仪温度控制PWM初始化
+#endif
     while(MPU6500_Init()){
         printf("MPU6500 init error！");
     }
@@ -289,15 +285,10 @@ void imu_init(void){
 //    while(IST8310_Init()){
 //        printf("IST8310 init error！");
 //    }
+    
     IST8310_Init();
     mpu_offset_call();
-    init_quaternion();
-}
-
-
-void GetIST8310_RawValues(uint8_t* buff)
-{
-    MPU6500_Read_Regs(MPU6500_EXT_SENS_DATA_00,buff,6);
+    init_quaternion(&imu.raw);
 }
 
 /**********************************************************************************/
@@ -305,7 +296,7 @@ void GetIST8310_RawValues(uint8_t* buff)
 /**********************************************************************************/
 
 //[0]-[9]为最近10次数据 [10]为10次数据的平均值
-void mpu6500_datasave(int16_t ax,int16_t ay,int16_t az,int16_t gx,int16_t gy,int16_t gz){
+void mpu6500_datasave(imu_rawdata_t const * mpudata){
 
     for(uint8_t i = 1;i<10;i++){
         MPU6500_FIFO[0][i-1] = MPU6500_FIFO[0][i];
@@ -316,12 +307,12 @@ void mpu6500_datasave(int16_t ax,int16_t ay,int16_t az,int16_t gx,int16_t gy,int
         MPU6500_FIFO[5][i-1] = MPU6500_FIFO[5][i];
     }
     
-    MPU6500_FIFO[0][9] = ax;
-    MPU6500_FIFO[1][9] = ay;
-    MPU6500_FIFO[2][9] = az;
-    MPU6500_FIFO[3][9] = gx;
-    MPU6500_FIFO[4][9] = gy;
-    MPU6500_FIFO[5][9] = gz;
+    MPU6500_FIFO[0][9] = mpudata->ax;
+    MPU6500_FIFO[1][9] = mpudata->ay;
+    MPU6500_FIFO[2][9] = mpudata->az;
+    MPU6500_FIFO[3][9] = mpudata->gx;
+    MPU6500_FIFO[4][9] = mpudata->gy;
+    MPU6500_FIFO[5][9] = mpudata->gz;
     
     for(uint8_t j = 0;j<6;j++){
             for(uint8_t i = 0;i<10;i++){
@@ -331,16 +322,16 @@ void mpu6500_datasave(int16_t ax,int16_t ay,int16_t az,int16_t gx,int16_t gy,int
     }
 }
 
-void IST8310_datasave(int16_t mx,int16_t my,int16_t mz){
+void IST8310_datasave(imu_rawdata_t const * mpudata){
 
     for(uint8_t i = 1;i<10;i++){
         IST8310_FIFO[0][i-1] = IST8310_FIFO[0][i];
         IST8310_FIFO[1][i-1] = IST8310_FIFO[1][i];
         IST8310_FIFO[2][i-1] = IST8310_FIFO[2][i];
     }
-    IST8310_FIFO[0][9] =  mx;//将新的数据放置到 数据的最后面
-    IST8310_FIFO[1][9] =  my;
-    IST8310_FIFO[2][9] =  mz;
+    IST8310_FIFO[0][9] = mpudata->mx;//将新的数据放置到 数据的最后面
+    IST8310_FIFO[1][9] = mpudata->my;
+    IST8310_FIFO[2][9] = mpudata->mz;
     
     for(uint8_t j = 0;j<3;j++){
         for(uint8_t i = 0;i<10;i++){
@@ -351,35 +342,59 @@ void IST8310_datasave(int16_t mx,int16_t my,int16_t mz){
 }
 
 void imu_calibrate(void){
+    imu.raw.ax -= imu.offset.ax;
+    imu.raw.ay -= imu.offset.ay;
+    imu.raw.az -= imu.offset.az;
     
-    float tempx,tempy,tempz;
-    tempx = (float)(imu.raw.mx -imu.offset.mag.mx);
-    tempy = (float)(imu.raw.my -imu.offset.mag.my);
-    tempz = (float)(imu.raw.mz -imu.offset.mag.mz);
-    #if ELLIPSOID_FIT
-        imu.raw.mx = (int16_t)(imu.offset.mag.b0*tempx+imu.offset.mag.b1*tempy+imu.offset.mag.b2*tempz);
-        imu.raw.my = (int16_t)(imu.offset.mag.b1*tempx+imu.offset.mag.b3*tempy+imu.offset.mag.b4*tempz);
-        imu.raw.mz = (int16_t)(imu.offset.mag.b2*tempx+imu.offset.mag.b4*tempy+imu.offset.mag.b5*tempz);
-    #else
-        imu.raw.mx = (int16_t) tempx;
-        imu.raw.my = (int16_t) tempy;
-        imu.raw.mz = (int16_t) tempz;
-    #endif
-    imu.rip.mx = (float)(imu.raw.mx*0.3f);
-    imu.rip.my = (float)(imu.raw.my*0.3f);
-    imu.rip.mz = (float)(imu.raw.mz*0.3f);
+    imu.raw.gx -= imu.offset.gx;
+    imu.raw.gy -= imu.offset.gy;
+    imu.raw.gz -= imu.offset.gz;
     
-    imu.raw.ax -=  imu.offset.ax;
-    imu.raw.ay -=  imu.offset.ay;
-    imu.raw.az -=  imu.offset.az;
-    
-    imu.raw.gx -=  imu.offset.gx;
-    imu.raw.gy -=  imu.offset.gy;
-    imu.raw.gz -=  imu.offset.gz;
+    imu.raw.mx -= imu.offset.mx;
+    imu.raw.my -= imu.offset.my;
+    imu.raw.mz -= imu.offset.mz;
 }
 
-//Get 6 axis data from MPU6500
-void IMU_Get_Raw_Data(void)
+void accel_low_pass_filter(imu_ripdata_t * mpudata){
+    static uint8_t updata_count=0;
+    //加速度计低通滤波
+    static double accel_fliter_1[3] = {0.0f, 0.0f, 0.0f};
+    static double accel_fliter_2[3] = {0.0f, 0.0f, 0.0f};
+    static double accel_fliter_3[3] = {0.0f, 0.0f, 0.0f};
+    static const double fliter_num[3] = {1.929454039488895f, -0.93178349823448126f, 0.002329458745586203f};
+
+    if(updata_count==0)
+    {
+        accel_fliter_1[0] = accel_fliter_2[0] = accel_fliter_3[0] = mpudata->ax;
+        accel_fliter_1[1] = accel_fliter_2[1] = accel_fliter_3[1] = mpudata->ay;
+        accel_fliter_1[2] = accel_fliter_2[2] = accel_fliter_3[2] = mpudata->az;
+        updata_count++;
+    }
+    else
+    {
+        accel_fliter_1[0] = accel_fliter_2[0];
+        accel_fliter_2[0] = accel_fliter_3[0];
+
+        accel_fliter_3[0] = accel_fliter_2[0] * fliter_num[0] + accel_fliter_1[0] * fliter_num[1] + mpudata->ax * fliter_num[2];
+
+        accel_fliter_1[1] = accel_fliter_2[1];
+        accel_fliter_2[1] = accel_fliter_3[1];
+
+        accel_fliter_3[1] = accel_fliter_2[1] * fliter_num[0] + accel_fliter_1[1] * fliter_num[1] + mpudata->ay * fliter_num[2];
+
+        accel_fliter_1[2] = accel_fliter_2[2];
+        accel_fliter_2[2] = accel_fliter_3[2];
+
+        accel_fliter_3[2] = accel_fliter_2[2] * fliter_num[0] + accel_fliter_1[2] * fliter_num[1] + mpudata->az * fliter_num[2];
+    }
+    
+    mpudata->ax = accel_fliter_3[0];
+    mpudata->ay = accel_fliter_3[1];
+    mpudata->az = accel_fliter_3[2];
+}
+
+
+void imu_get_data(void)
 {
     MPU6500_Read_Regs(MPU6500_ACCEL_XOUT_H, mpu_buff, 14);
 
@@ -398,8 +413,8 @@ void IMU_Get_Raw_Data(void)
     
     imu_calibrate();
     
-    mpu6500_datasave(imu.raw.ax,imu.raw.ay,imu.raw.az,imu.raw.gx,imu.raw.gy,imu.raw.gz); 
-    IST8310_datasave(imu.raw.mx, imu.raw.my, imu.raw.mz);
+    mpu6500_datasave(&imu.raw);
+    IST8310_datasave(&imu.raw);
 
     imu.raw.ax = (int16_t)MPU6500_FIFO[0][10];
     imu.raw.ay = (int16_t)MPU6500_FIFO[1][10];
@@ -420,59 +435,40 @@ void IMU_Get_Raw_Data(void)
     imu.rip.ay = (float)(imu.raw.ay * 9.80665f / 16384.0f);
     imu.rip.az = (float)(imu.raw.az * 9.80665f / 16384.0f);
 
-//    imu.rip.ax = (float)(imu.raw.ax / 16384.0f);
-//    imu.rip.ay = (float)(imu.raw.ay / 16384.0f);
-//    imu.rip.az = (float)(imu.raw.az / 16384.0f);
+//    accel_low_pass_filter(&imu.rip);
 
-    static uint8_t updata_count=0;
-    //加速度计低通滤波
-    static double accel_fliter_1[3] = {0.0f, 0.0f, 0.0f};
-    static double accel_fliter_2[3] = {0.0f, 0.0f, 0.0f};
-    static double accel_fliter_3[3] = {0.0f, 0.0f, 0.0f};
-    static const double fliter_num[3] = {1.929454039488895f, -0.93178349823448126f, 0.002329458745586203f};
-
-    if(updata_count==0)
-    {
-        accel_fliter_1[0] = accel_fliter_2[0] = accel_fliter_3[0] = imu.rip.ax;
-        accel_fliter_1[1] = accel_fliter_2[1] = accel_fliter_3[1] = imu.rip.ay;
-        accel_fliter_1[2] = accel_fliter_2[2] = accel_fliter_3[2] = imu.rip.az;
-        updata_count++;
-    }
-    else
-    {
-        accel_fliter_1[0] = accel_fliter_2[0];
-        accel_fliter_2[0] = accel_fliter_3[0];
-
-        accel_fliter_3[0] = accel_fliter_2[0] * fliter_num[0] + accel_fliter_1[0] * fliter_num[1] + imu.rip.ax * fliter_num[2];
-
-        accel_fliter_1[1] = accel_fliter_2[1];
-        accel_fliter_2[1] = accel_fliter_3[1];
-
-        accel_fliter_3[1] = accel_fliter_2[1] * fliter_num[0] + accel_fliter_1[1] * fliter_num[1] + imu.rip.ay * fliter_num[2];
-
-        accel_fliter_1[2] = accel_fliter_2[2];
-        accel_fliter_2[2] = accel_fliter_3[2];
-
-        accel_fliter_3[2] = accel_fliter_2[2] * fliter_num[0] + accel_fliter_1[2] * fliter_num[1] + imu.rip.az * fliter_num[2];
-    }
-    
-    imu.rip.ax = accel_fliter_3[0];
-    imu.rip.ay = accel_fliter_3[1];
-    imu.rip.az = accel_fliter_3[2];
-    
 /* +-1000dps -> rad/s */
     imu.rip.gx = (float)(imu.raw.gx /32.8f /57.3f);
     imu.rip.gy = (float)(imu.raw.gy /32.8f /57.3f);
     imu.rip.gz = (float)(imu.raw.gz /32.8f /57.3f);
-/* +-2000dps -> rad/s */
-//    imu.rip.gx = (float)(imu.raw.gx /16.4f /57.3f);
-//    imu.rip.gy = (float)(imu.raw.gy /16.4f /57.3f);
-//    imu.rip.gz = (float)(imu.raw.gz /16.4f /57.3f);
+
+}
+
+static void get_ist_mag_offset(void){
+    int16_t mag_max[3], mag_min[3];
+    int i;
+    for (i = 0; i < 500; i++){
+        GetIST8310_RawValues(ist_buff);
+        memcpy(&imu.raw.mx, ist_buff, 6);
+    if ((abs(imu.raw.mx) < 400) && (abs(imu.raw.my) < 400) && (abs(imu.raw.mz) < 400)){
+        mag_max[0] = VAL_MAX(mag_max[0], imu.raw.mx);
+        mag_min[0] = VAL_MIN(mag_min[0], imu.raw.mx);
+
+        mag_max[1] = VAL_MAX(mag_max[1], imu.raw.my);
+        mag_min[1] = VAL_MIN(mag_min[1], imu.raw.my);
+
+        mag_max[2] = VAL_MAX(mag_max[2], imu.raw.mz);
+        mag_min[2] = VAL_MIN(mag_min[2], imu.raw.mz);
+    }
+    delay_ms(2);
+    }
+    imu.offset.mx = (int16_t)((mag_max[0] + mag_min[0]) * 0.5f);
+    imu.offset.my = (int16_t)((mag_max[1] + mag_min[1]) * 0.5f);
+    imu.offset.mz = (int16_t)((mag_max[2] + mag_min[2]) * 0.5f);
 }
 
 void mpu_offset_call(void){
-
-    int i;
+    int i=0;
     for (i = 0; i<300;i++){
         MPU6500_Read_Regs(MPU6500_ACCEL_XOUT_H, mpu_buff, 14);
 
@@ -484,12 +480,15 @@ void mpu_offset_call(void){
         imu.offset.gy +=  mpu_buff[10] << 8 | mpu_buff[11];
         imu.offset.gz +=  mpu_buff[12] << 8 | mpu_buff[13];
 
-        delay_ms(5);
+        delay_ms(2);
     }
+    
+    get_ist_mag_offset();
+    
     for(i = 0;i<20;i++){
         GetIST8310_RawValues(ist_buff);
         memcpy(&imu.raw.mx, ist_buff, 6);
-        IST8310_datasave(imu.raw.mx, imu.raw.my, imu.raw.mz);
+        IST8310_datasave(&imu.raw);
     }
 
     imu.offset.ax = imu.offset.ax / 300;
@@ -499,16 +498,108 @@ void mpu_offset_call(void){
     imu.offset.gy = imu.offset.gy / 300;
     imu.offset.gz = imu.offset.gz / 300;
     //用来初始化四元数
-    imu.raw.mx = (int16_t)IST8310_FIFO[0][10];
-    imu.raw.my = (int16_t)IST8310_FIFO[1][10];
-    imu.raw.mz = (int16_t)IST8310_FIFO[2][10];
+    imu.raw.mx = (int16_t)IST8310_FIFO[0][10]-imu.offset.mx;
+    imu.raw.my = (int16_t)IST8310_FIFO[1][10]-imu.offset.my;
+    imu.raw.mz = (int16_t)IST8310_FIFO[2][10]-imu.offset.mz;
 }
-void mahony_ahrs_updateIMU(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz)
+void mahony_ahrs_updateIMU(imu_ripdata_t const *mpudata)
 {
-  float recipNorm;
-  float halfvx, halfvy, halfvz;
-  float halfex, halfey, halfez;
-  float qa, qb, qc;
+    float recipNorm;
+    float halfvx, halfvy, halfvz;
+    float halfex, halfey, halfez;
+    float qa, qb, qc;
+
+    gx = mpudata->gx;
+    gy = mpudata->gy;
+    gz = mpudata->gz;
+    ax = mpudata->ax;
+    ay = mpudata->ay;
+    az = mpudata->az;
+
+    // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
+    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))){
+
+        // Normalise accelerometer measurement
+        recipNorm = invSqrt(ax * ax + ay * ay + az * az);
+        ax *= recipNorm;
+        ay *= recipNorm;
+        az *= recipNorm;
+
+        // Estimated direction of gravity and vector perpendicular to magnetic flux
+        halfvx = q1 * q3 - q0 * q2;
+        halfvy = q0 * q1 + q2 * q3;
+        halfvz = q0 * q0 - 0.5f + q3 * q3;
+
+        // Error is sum of cross product between estimated and measured direction of gravity
+        halfex = (ay * halfvz - az * halfvy);
+        halfey = (az * halfvx - ax * halfvz);
+        halfez = (ax * halfvy - ay * halfvx);
+
+        // Compute and apply integral feedback if enabled
+        if (twoKi > 0.0f){
+          integralFBx += twoKi * halfex * (1.0f / sampleFreq); // integral error scaled by Ki
+          integralFBy += twoKi * halfey * (1.0f / sampleFreq);
+          integralFBz += twoKi * halfez * (1.0f / sampleFreq);
+          gx += integralFBx; // apply integral feedback
+          gy += integralFBy;
+          gz += integralFBz;
+        }
+        else{
+          integralFBx = 0.0f; // prevent integral windup
+          integralFBy = 0.0f;
+          integralFBz = 0.0f;
+        }
+
+        // Apply proportional feedback
+        gx += twoKp * halfex;
+        gy += twoKp * halfey;
+        gz += twoKp * halfez;
+    }
+
+    // Integrate rate of change of quaternion
+    gx *= (0.5f * (1.0f / sampleFreq)); // pre-multiply common factors
+    gy *= (0.5f * (1.0f / sampleFreq));
+    gz *= (0.5f * (1.0f / sampleFreq));
+    qa = q0;
+    qb = q1;
+    qc = q2;
+    q0 += (-qb * gx - qc * gy - q3 * gz);
+    q1 += (qa * gx + qc * gz - q3 * gy);
+    q2 += (qa * gy - qb * gz + q3 * gx);
+    q3 += (qa * gz + qb * gy - qc * gx);
+
+    // Normalise quaternion
+    recipNorm = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    q0 *= recipNorm;
+    q1 *= recipNorm;
+    q2 *= recipNorm;
+    q3 *= recipNorm;
+}
+
+//this function takes 56.8us.(168M)
+void mahony_ahrs_update(imu_ripdata_t const *mpudata)
+{
+    float recipNorm;
+    float q0q0, q0q1, q0q2, q0q3, q1q1, q1q2, q1q3, q2q2, q2q3, q3q3;
+    float hx, hy, bx, bz;
+    float halfvx, halfvy, halfvz, halfwx, halfwy, halfwz;
+    float halfex, halfey, halfez;
+    float qa, qb, qc;
+
+    gx = mpudata->gx;
+    gy = mpudata->gy;
+    gz = mpudata->gz;
+    ax = mpudata->ax;
+    ay = mpudata->ay;
+    az = mpudata->az;
+    mx = mpudata->mx;
+    my = mpudata->my;
+    mz = mpudata->mz;
+    
+#if AXIS_6 == 1
+    mahony_ahrs_updateIMU(mpudata);
+    return;
+#endif
 
   // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
   if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)))
@@ -520,15 +611,42 @@ void mahony_ahrs_updateIMU(float gx, float gy, float gz, float ax, float ay, flo
     ay *= recipNorm;
     az *= recipNorm;
 
-    // Estimated direction of gravity and vector perpendicular to magnetic flux
-    halfvx = q1 * q3 - q0 * q2;
-    halfvy = q0 * q1 + q2 * q3;
-    halfvz = q0 * q0 - 0.5f + q3 * q3;
+    // Normalise magnetometer measurement
+    recipNorm = invSqrt(mx * mx + my * my + mz * mz);
+    mx *= recipNorm;
+    my *= recipNorm;
+    mz *= recipNorm;
 
-    // Error is sum of cross product between estimated and measured direction of gravity
-    halfex = (ay * halfvz - az * halfvy);
-    halfey = (az * halfvx - ax * halfvz);
-    halfez = (ax * halfvy - ay * halfvx);
+    // Auxiliary variables to avoid repeated arithmetic
+    q0q0 = q0 * q0;
+    q0q1 = q0 * q1;
+    q0q2 = q0 * q2;
+    q0q3 = q0 * q3;
+    q1q1 = q1 * q1;
+    q1q2 = q1 * q2;
+    q1q3 = q1 * q3;
+    q2q2 = q2 * q2;
+    q2q3 = q2 * q3;
+    q3q3 = q3 * q3;
+
+    // Reference direction of Earth's magnetic field
+    hx = 2.0f * (mx * (0.5f - q2q2 - q3q3) + my * (q1q2 - q0q3) + mz * (q1q3 + q0q2));
+    hy = 2.0f * (mx * (q1q2 + q0q3) + my * (0.5f - q1q1 - q3q3) + mz * (q2q3 - q0q1));
+    bx = sqrt(hx * hx + hy * hy);
+    bz = 2.0f * (mx * (q1q3 - q0q2) + my * (q2q3 + q0q1) + mz * (0.5f - q1q1 - q2q2));
+
+    // Estimated direction of gravity and magnetic field
+    halfvx = q1q3 - q0q2;
+    halfvy = q0q1 + q2q3;
+    halfvz = q0q0 - 0.5f + q3q3;
+    halfwx = bx * (0.5f - q2q2 - q3q3) + bz * (q1q3 - q0q2);
+    halfwy = bx * (q1q2 - q0q3) + bz * (q0q1 + q2q3);
+    halfwz = bx * (q0q2 + q1q3) + bz * (0.5f - q1q1 - q2q2);
+
+    // Error is sum of cross product between estimated direction and measured direction of field vectors
+    halfex = (ay * halfvz - az * halfvy) + (my * halfwz - mz * halfwy);
+    halfey = (az * halfvx - ax * halfvz) + (mz * halfwx - mx * halfwz);
+    halfez = (ax * halfvy - ay * halfvx) + (mx * halfwy - my * halfwx);
 
     // Compute and apply integral feedback if enabled
     if (twoKi > 0.0f)
@@ -573,12 +691,12 @@ void mahony_ahrs_updateIMU(float gx, float gy, float gz, float ax, float ay, flo
   q3 *= recipNorm;
 }
 
-void init_quaternion(void){
-    int16_t hx, hy;//hz;
+void init_quaternion(imu_rawdata_t const * mpudata){
+    int16_t hx, hy;
     
-    hx = imu.raw.mx;
-    hy = imu.raw.my;
-    //hz = imu.raw.mz;
+    hx = mpudata->mx;
+    hy = mpudata->my;
+
     
     #ifdef BOARD_DOWN
     if (hx < 0 && hy < 0) 
@@ -728,126 +846,17 @@ void init_quaternion(void){
 }
 
 
-void IMU_AHRSupdate(void){
-    float norm,halfT;
-    float hx, hy, hz, bx, bz;
-    float vx, vy, vz, wx, wy, wz;
-    float ex, ey, ez;
-    float tempq0,tempq1,tempq2,tempq3;
-
-    float q0q0 = q0*q0;
-    float q0q1 = q0*q1;
-    float q0q2 = q0*q2;
-    float q0q3 = q0*q3;
-    float q1q1 = q1*q1;
-    float q1q2 = q1*q2;
-    float q1q3 = q1*q3;
-    float q2q2 = q2*q2;
-    float q2q3 = q2*q3;
-    float q3q3 = q3*q3;
-
-    gx = imu.rip.gx;
-    gy = imu.rip.gy;
-    gz = imu.rip.gz;
-//    ax = imu.raw.ax;
-//    ay = imu.raw.ay;
-//    az = imu.raw.az;
-//    mx = imu.raw.mx;
-//    my = imu.raw.my;
-//    mz = imu.raw.mz;
-    ax = imu.rip.ax;
-    ay = imu.rip.ay;
-    az = imu.rip.az;
-    mx = imu.rip.mx;
-    my = imu.rip.my;
-    mz = imu.rip.mz;
-
-    now_update  = Get_Time_Micros(); //ms
-    halfT       = ((float)(now_update - last_update) / 2000.0f);
-    last_update = now_update;
-    
-    /* Fast inverse square-root */
-    norm = invSqrt(ax*ax + ay*ay + az*az);
-    ax = ax * norm;
-    ay = ay * norm;
-    az = az * norm;
-    
-    #ifdef IST8310
-        norm = invSqrt(mx*mx + my*my + mz*mz);
-        mx = mx * norm;
-        my = my * norm;
-        mz = mz * norm;
-    #else
-        mx = 0;
-        my = 0;
-        mz = 0;
-    #endif
-    /* compute reference direction of flux */
-    hx = 2.0f*mx*(0.5f - q2q2 - q3q3) + 2.0f*my*(q1q2 - q0q3) + 2.0f*mz*(q1q3 + q0q2);
-    hy = 2.0f*mx*(q1q2 + q0q3) + 2.0f*my*(0.5f - q1q1 - q3q3) + 2.0f*mz*(q2q3 - q0q1);
-    hz = 2.0f*mx*(q1q3 - q0q2) + 2.0f*my*(q2q3 + q0q1) + 2.0f*mz*(0.5f - q1q1 - q2q2);
-    bx = sqrt((hx*hx) + (hy*hy));
-    bz = hz;
-    
-    /* estimated direction of gravity and flux (v and w) */
-    vx = 2.0f*(q1q3 - q0q2);
-    vy = 2.0f*(q0q1 + q2q3);
-    vz = q0q0 - q1q1 - q2q2 + q3q3;
-    wx = 2.0f*bx*(0.5f - q2q2 - q3q3) + 2.0f*bz*(q1q3 - q0q2);
-    wy = 2.0f*bx*(q1q2 - q0q3) + 2.0f*bz*(q0q1 + q2q3);
-    wz = 2.0f*bx*(q0q2 + q1q3) + 2.0f*bz*(0.5f - q1q1 - q2q2);
-    
-    /* 
-     * error is sum of cross product between reference direction 
-     * of fields and direction measured by sensors 
-     */
-    ex = (ay*vz - az*vy) + (my*wz - mz*wy);
-    ey = (az*vx - ax*vz) + (mz*wx - mx*wz);
-    ez = (ax*vy - ay*vx) + (mx*wy - my*wx);
-
-    /* PI */
-    if(ex !=   0.0f && ey !=   0.0f && ez !=   0.0f)
-    {
-        exInt = exInt + ex * Ki * halfT;
-        eyInt = eyInt + ey * Ki * halfT;
-        ezInt = ezInt + ez * Ki * halfT;
-        
-        gx = gx + Kp*ex + exInt;
-        gy = gy + Kp*ey + eyInt;
-        gz = gz + Kp*ez + ezInt;
-    }
-    
-    tempq0 = q0 + (-q1*gx - q2*gy - q3*gz) * halfT;
-    tempq1 = q1 + ( q0*gx + q2*gz - q3*gy) * halfT;
-    tempq2 = q2 + ( q0*gy - q1*gz + q3*gx) * halfT;
-    tempq3 = q3 + ( q0*gz + q1*gy - q2*gx) * halfT;
-
-    /* normalise quaternion */
-    norm = invSqrt(tempq0*tempq0 + tempq1*tempq1 + tempq2*tempq2 + tempq3*tempq3);
-    q0 = tempq0 * norm;
-    q1 = tempq1 * norm;
-    q2 = tempq2 * norm;
-    q3 = tempq3 * norm;
-}
-
-
 void IMU_getYawPitchRoll(void)
 {
     volatile static float yaw_temp = 0,last_yaw_temp = 0;
     volatile static int   yaw_count = 0;
-//    // yaw    -pi----pi
-//    imu.rip.yaw = -atan2(2 * q1 * q2 + 2 * q0* q3, -2 * q2*q2 - 2 * q3 * q3 + 1)* 57.3;
-//    // pitch  -pi/2--- pi/2
-//    imu.rip.pit = -asin(-2 * q1 * q3 + 2 * q0 * q2)* 57.3;
-//    // roll   -pi-----pi
-//    imu.rip.rol = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1)* 57.3;
     // yaw    -pi----pi
     imu.rip.yaw = atan2(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3)* 57.3;
     // pitch  -pi/2--- pi/2
     imu.rip.pit = -asin(2.0f * (q1 * q3 - q0 * q2))* 57.3;
     // roll   -pi-----pi
     imu.rip.rol = atan2(2.0f * (q0 * q1 + q2 * q3), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3)* 57.3;
-
+    //yaw数据连续化
     last_yaw_temp = yaw_temp;
     yaw_temp = imu.rip.yaw; 
     if(yaw_temp - last_yaw_temp>= 330){
@@ -859,28 +868,26 @@ void IMU_getYawPitchRoll(void)
     imu.rip.yaw = yaw_temp + yaw_count*360;
 }
 
-static uint8_t first_temperature = 0;
-
 static int8_t IMU_GET_CONTROL_TEMPERATURE(void){
     static int8_t control_temperature = 0;
-        static uint8_t count=0;
+    static uint8_t count=0;
     if(count==0){
-            control_temperature = (int8_t)(get_temprate()) + 10;
-            if (control_temperature > (int8_t)(GYRO_CONST_MAX_TEMP))
-            {
-                    control_temperature = (int8_t)(GYRO_CONST_MAX_TEMP);
-            }
-            count=1;
+        control_temperature = (int8_t)(get_temprate()) + 10;
+        if (control_temperature > (int8_t)(GYRO_CONST_MAX_TEMP))
+        {
+            control_temperature = (int8_t)(GYRO_CONST_MAX_TEMP);
         }
-//        printf("%8d\r\n", control_temperature);
+        count=1;
+    }
+//    printf("control_temperature:%5d，imu_temperature:%5.3f\r\n", control_temperature,imu.rip.temp);
+//    printf("%8.3lf,%5d，%5.3f\r\n",imu.rip.yaw, control_temperature,imu.rip.temp);
     return control_temperature;
 }
-
-PID_Regulator_t IMUTemperaturePID = IMU_Temperature_PID_DEFAULT;
 
 static void IMU_temp_Control(double temp)
 {
     uint16_t tempPWM;
+    static uint8_t first_temperature = 0;
     static uint8_t temp_constant_time = 0 ;
     if (first_temperature)
     {
@@ -893,7 +900,8 @@ static void IMU_temp_Control(double temp)
             IMUTemperaturePID.output = 0.0f;
         }
         tempPWM = (uint16_t)IMUTemperaturePID.output;
-        TIM_SetCompare2(TIM3, (tempPWM));
+        TIM_SetCompare2(TIM3, tempPWM);
+
     }
     else
     {
@@ -901,14 +909,15 @@ static void IMU_temp_Control(double temp)
         if (temp > IMU_GET_CONTROL_TEMPERATURE())
         {
             temp_constant_time ++;
-            if(temp_constant_time > 200)
+            if(temp_constant_time > 50)
             {
                 //达到设置温度，将积分项设置为一半最大功率，加速收敛
                 first_temperature = 1;
                 //imuTempPid.Iout = MPU6500_TEMP_PWM_MAX / 2.0f;
             }
+
         }
-        TIM_SetCompare2(TIM3, (MPU6500_TEMP_PWM_MAX - 1));
+        TIM_SetCompare2(TIM3, MPU6500_TEMP_PWM_MAX - 1);
     }
 }
 
@@ -933,15 +942,15 @@ float get_imu_wz(void){
 }
 
 void imu_main(void){
-    IMU_Get_Raw_Data();
-//    mahony_ahrs_updateIMU(imu.rip.gx, imu.rip.gy, imu.rip.gz, imu.rip.ax, imu.rip.ay, imu.rip.az, imu.raw.mx, imu.raw.my, imu.raw.mz);
-//    IMU_AHRSupdate();
-//    IMU_temp_Control(imu.rip.temp);
-//    IMU_getYawPitchRoll();
-    delay_ms(5);
+    imu_get_data();
+    mahony_ahrs_update(&imu.rip);
+#if IMU_TEMPERATURE_CONTROL == 1
+    IMU_temp_Control(imu.rip.temp);
+#endif
+    IMU_getYawPitchRoll();
 #if Monitor_IMU_Angle == 1
     printf("yaw_angle:%8.3lf   pit_angle:%8.3lf  rol_angle:%8.3lf\r\n", imu.rip.yaw, imu.rip.pit, imu.rip.rol);
-//    printf("%8.3lf,%8.3lf,%8.3lf\r\n", imu.rip.yaw, imu.rip.pit,imu.rip.yaw - 1.74*fabs(imu.rip.pit));
+
     delay_ms(5);
 #endif
 #if Monitor_IMU_Gyro == 1

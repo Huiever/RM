@@ -27,7 +27,7 @@
 
 void BSP_Pre_Init(void){
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-
+    
     KEY_Init();
     LED_Init(); 
     BEEP_Init();
@@ -35,8 +35,6 @@ void BSP_Pre_Init(void){
     delay_ms(100);
     USART2_Init(115200);
     USART3_Init(115200);
-
-    temperature_ADC_init();
 
     TIM2_Init();
     SPI5_Init();
@@ -59,6 +57,18 @@ void BSP_Init(void)
     Flags_Init();
 
     Gun_Init();
+#if Calibrate_Snail_ESC == 1       //油门校准，零油门--1ms高电平 满油门--2ms高电平
+    SetFrictionWheelSpeed(2000);        
+    delay_ms(3000);
+    SetFrictionWheelSpeed(1000);
+    delay_ms(3000);
+#endif
+#if Calibrate_Snail_ESC == 2       //转向切换，需要手动转动摩擦轮改变摩擦轮的方向
+    SetFrictionWheelSpeed(2000);
+    delay_ms(6000);
+    SetFrictionWheelSpeed(1000);
+    delay_ms(3000);
+#endif
     Laser_Init();
     delay_ms(100);
     Judge_Init();

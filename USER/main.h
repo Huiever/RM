@@ -3,15 +3,14 @@
 
 #include "flags.h"
 
-/* Specify the prepare time(ms) */
-#define PREPARE_TIME_MS           4000
+#define VAL_MIN(a, b) ((a) < (b) ? (a) : (b))
+#define VAL_MAX(a, b) ((a) > (b) ? (a) : (b))
 
-/* Adjust the Kp and Ki of IMU module
-   This can change the convergence speed of the IMU output */
-#define IMU_Kp                      20.0f
-#define IMU_Ki                      0.1f
-#define ELLIPSOID_FIT               0//Õ÷«Úƒ‚∫œ
-#define AXIS_6                      1
+/* Specify the prepare time(ms) */
+#define PREPARE_TIME_MS             4000
+
+/* Calibrate The Snail 430-R Racing ESC */
+#define Calibrate_Snail_ESC         0
 
 /* Choose to monitor the output of IMU */
 #define Monitor_IMU_Angle           0
@@ -21,7 +20,8 @@
 /* Choose to monitor the output of remoter */
 #define Monitor_Remoter             0
 
-/* Debug pid parameters 0--null 1--position 2--speed*/
+/* Debug pid parameters  0          1          2
+                        null  position  speed */
 #define DEBUG_YAW_PID               0
 #define DEBUG_PITCH_PID             0
 

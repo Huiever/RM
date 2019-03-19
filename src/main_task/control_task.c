@@ -40,7 +40,7 @@ void Control_Task(void){
     GMPitchControlLoop();
     GMYawControlLoop();
 #if Monitor_GM_Encoder==0
-    SetGimbalMotorOutput();
+//    SetGimbalMotorOutput();
 #endif
     if(time_tick_1ms % 2 == 0){
         ShootControlLoop();
@@ -113,7 +113,6 @@ void GimbalYawControlModeSwitch(void){
     static uint8_t  RunAwayFlag   = 0;
     static uint8_t  ControlFlag   = 0;
     static float    YawAngleSave  = 0.0f;
-    static uint8_t  Flag_Cruise_Reverse = 0;
     static int16_t  Cruise_Time_Between = 0;
     static uint8_t  pitch_dowm_flag = 0;
     switch(GetWorkState()){
@@ -362,7 +361,7 @@ void ShootControlLoop(void){
         Set_Rammer_Current( CAN1, (int16_t)RAMMERSpeedPID.output );
     }
     else{
-        RammerSpeedPID( ( int16_t ) 6000 );
+        RammerSpeedPID( ( int16_t ) 1000 );
         Set_Rammer_Current( CAN1, (int16_t)RAMMERSpeedPID.output );
     }
 

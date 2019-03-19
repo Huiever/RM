@@ -208,7 +208,7 @@ void RemoteDataProcess(uint8_t *pData){
 #if DEBUG_YAW_PID == 0 && DEBUG_PITCH_PID == 0
                 Gimbal_Target.pitch_angle_target += (float)(RC_CtrlData.rc.ch3 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
                                                     * STICK_TO_PITCH_ANGLE_INC_FACT;
-                Gimbal_Target.yaw_angle_target   += (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
+                Gimbal_Target.yaw_angle_target   -= (float)(RC_CtrlData.rc.ch2 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
                                                     * STICK_TO_YAW_ANGLE_INC_FACT;
 #endif
                 if( RC_CtrlData.rc.s1 == 1 ){
@@ -224,6 +224,7 @@ void RemoteDataProcess(uint8_t *pData){
                     Set_Flag_AutoShoot(1);
                 }
             }
+
             GimbalAngleLimit();
         }
     }

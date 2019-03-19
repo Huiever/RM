@@ -71,7 +71,7 @@ typedef struct{
     u8    robotLevel;                    //机器人当前等级;
     u16    remainHP;                    //机器人当前血量;
     u16    maxHP;                        //机器人满血量;
-    position_t    position;            //位置，角度信息;
+  position_t    position;            //位置，角度信息;
 }extGameRobotState_t;
 
 typedef struct{
