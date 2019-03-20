@@ -27,6 +27,6 @@ int main(void){
 //        VisualScope(USART2, RAMMERSpeedPID.fdb,RAMMERSpeedPID.ref,GMYPositionPID.fdb,GMYPositionPID.ref);
 //        VisualScope(USART2, GMPPositionPID.fdb,GMPPositionPID.ref, GMPSpeedPID.fdb, GMPSpeedPID.ref);
         imu_main();
-        delay_ms(5);
+//        delay_ms(5);
     }
 }

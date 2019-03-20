@@ -4,17 +4,18 @@
 
 /* Adjust the Kp and Ki of IMU module
    This can change the convergence speed of the IMU output */
+#define BOARD_DOWN                  (1)
 #define sampleFreq                  200.0f                  // sample frequency in Hz
 #define twoKpDef                    (40.0f * 0.5f)          // 2 * proportional gain
 #define twoKiDef                    (2.0f * 0.005f)         // 2 * integral gain
-#define AXIS_6                      1
+#define AXIS_6                      0
 #define IMU_TEMPERATURE_CONTROL     0
 
 #define MPU6500_NSS_Low() GPIO_WriteBit(GPIOF, GPIO_Pin_6, Bit_RESET)
 #define MPU6500_NSS_High() GPIO_WriteBit(GPIOF, GPIO_Pin_6, Bit_SET)
 
 #define MPU6500_TEMP_PWM_MAX 5000 //mpu6500控制温度的设置TIM的重载值，即给PWM最大为 MPU6500_TEMP_PWM_MAX - 1
-#define GYRO_CONST_MAX_TEMP 45.0f //陀螺仪控制恒温 最大控制温度
+#define GYRO_CONST_MAX_TEMP 45 //陀螺仪控制恒温 最大控制温度
 
 #define MPU6500_TEMPERATURE_FACTOR 0.002f
 #define MPU6500_TEMPERATURE_OFFSET 23.0f

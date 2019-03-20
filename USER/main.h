@@ -21,7 +21,7 @@
 #define Monitor_Remoter             0
 
 /* Debug pid parameters  0          1          2
-                        null  position  speed */
+                        null     position    speed */
 #define DEBUG_YAW_PID               0
 #define DEBUG_PITCH_PID             0
 
@@ -33,7 +33,6 @@
 
 /* Change the encoder offset of pitch/yaw motor */
 #define Pit_Encoder_Offset          1300
-#define Yaw_Encoder_Offset          3090
 
 /* Change the max duty of friction wheel,
    which is the max speed of friction wheel */

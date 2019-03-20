@@ -6,7 +6,6 @@
 static uint32_t can_count = 0;
 
 volatile Encoder GMYawEncoder   = {0,0,0,0,0,0,0,0,0};
-//volatile Encoder GMYawEncoder   = {0,0,0,0,0,0,Yaw_Encoder_Offset,0,0};
 volatile Encoder GMPitchEncoder = {0,0,0,0,0,0,Pit_Encoder_Offset,0,0};
 
 volatile rammer Rammer = { 0, 0, 0 };
@@ -48,25 +47,17 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
     switch(msg->StdId){
         case CAN_BUS1_Yaw_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMYawEncoder, msg);
-//            if(can_count>=90 && can_count<=100){
-//                if((GMYawEncoder.ecd_bias - GMYawEncoder.ecd_value) <-4000){
-//                    GMYawEncoder.ecd_bias = Yaw_Encoder_Offset + 8192;
-//                }
-//                else if((GMYawEncoder.ecd_bias - GMYawEncoder.ecd_value) > 4000){
-//                    GMYawEncoder.ecd_bias = Yaw_Encoder_Offset - 8192;
-//                }
-//            }
         }break;
         case CAN_BUS1_Pitch_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMPitchEncoder, msg);
-            if(can_count>=90 && can_count<=100){
-                if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) <-4000){
-                    GMPitchEncoder.ecd_bias = Yaw_Encoder_Offset + 8192;
-                }
-                else if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) > 4000){
-                    GMPitchEncoder.ecd_bias = Yaw_Encoder_Offset - 8192;
-                }
-            }
+//            if(can_count>=90 && can_count<=100){
+//                if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) <-4000){
+//                    GMPitchEncoder.ecd_bias = Pit_Encoder_Offset + 8192;
+//                }
+//                else if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) > 4000){
+//                    GMPitchEncoder.ecd_bias = Pit_Encoder_Offset - 8192;
+//                }
+//            }
         }break;
         case CAN_BUS1_Rammer_FEEDBACK_MSG_ID:{
             Rammer.angle  = msg->Data[0] << 8 | msg->Data[1];

@@ -11,10 +11,6 @@
 #include "main.h"
 #include "pid_regulator.h"
 #include "math.h"
-
-#define BOARD_DOWN (1)
-#define IST8310
-
 //---------------------------------------------------------------------------------------------------
 // Variable definitions
 static volatile float twoKp = twoKpDef;                                           // 2 * proportional gain (Kp)
@@ -32,12 +28,12 @@ uint8_t               ist_buff[6];                           /* buffer to save I
                                                                                                     
 imu_t imu = {
             {0,0,0,0,0,0,0,0,0,0},       //raw
-            {0,0,0,0,0,0,0,0,0,},     //offset
+            {0,0,0,0,0,0,0,0,0,},        //offset
             {0,0,0,0,0,0,0,0,0,0,0,0,0}  //rip
             };
 
-int32_t MPU6500_FIFO[6][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平均值
-int16_t IST8310_FIFO[3][11] = {0};    //[0]-[9]为最近10次数据 [10]为10次数据的平均值 
+int32_t MPU6500_FIFO[6][6] = {0};    //[0]-[4]为最近5次数据 [5]为5次数据的平均值
+int16_t IST8310_FIFO[3][6] = {0};    //[0]-[4]为最近5次数据 [5]为5次数据的平均值 
                                       //注：磁传感器的采样频率慢，所以单独列出
 uint8_t MPU_id = 0x70;
 
@@ -295,10 +291,10 @@ void imu_init(void){
 /*将MPU6500_ax,MPU6500_ay, MPU6500_az,MPU6500_gx, MPU6500_gy, MPU6500_gz处理后存储*/
 /**********************************************************************************/
 
-//[0]-[9]为最近10次数据 [10]为10次数据的平均值
+//[0]-[4]为最近5次数据 [5]为5次数据的平均值
 void mpu6500_datasave(imu_rawdata_t const * mpudata){
 
-    for(uint8_t i = 1;i<10;i++){
+    for(uint8_t i = 1;i<5;i++){
         MPU6500_FIFO[0][i-1] = MPU6500_FIFO[0][i];
         MPU6500_FIFO[1][i-1] = MPU6500_FIFO[1][i];
         MPU6500_FIFO[2][i-1] = MPU6500_FIFO[2][i];
@@ -307,37 +303,37 @@ void mpu6500_datasave(imu_rawdata_t const * mpudata){
         MPU6500_FIFO[5][i-1] = MPU6500_FIFO[5][i];
     }
     
-    MPU6500_FIFO[0][9] = mpudata->ax;
-    MPU6500_FIFO[1][9] = mpudata->ay;
-    MPU6500_FIFO[2][9] = mpudata->az;
-    MPU6500_FIFO[3][9] = mpudata->gx;
-    MPU6500_FIFO[4][9] = mpudata->gy;
-    MPU6500_FIFO[5][9] = mpudata->gz;
+    MPU6500_FIFO[0][4] = mpudata->ax;
+    MPU6500_FIFO[1][4] = mpudata->ay;
+    MPU6500_FIFO[2][4] = mpudata->az;
+    MPU6500_FIFO[3][4] = mpudata->gx;
+    MPU6500_FIFO[4][4] = mpudata->gy;
+    MPU6500_FIFO[5][4] = mpudata->gz;
     
     for(uint8_t j = 0;j<6;j++){
-            for(uint8_t i = 0;i<10;i++){
-                MPU6500_FIFO[j][10] += MPU6500_FIFO[j][i];
+            for(uint8_t i = 0;i<5;i++){
+                MPU6500_FIFO[j][5] += MPU6500_FIFO[j][i];
             }
-            MPU6500_FIFO[j][10] = MPU6500_FIFO[j][10]/10;
+            MPU6500_FIFO[j][5] = MPU6500_FIFO[j][5]/5;
     }
 }
 
 void IST8310_datasave(imu_rawdata_t const * mpudata){
 
-    for(uint8_t i = 1;i<10;i++){
+    for(uint8_t i = 1;i<5;i++){
         IST8310_FIFO[0][i-1] = IST8310_FIFO[0][i];
         IST8310_FIFO[1][i-1] = IST8310_FIFO[1][i];
         IST8310_FIFO[2][i-1] = IST8310_FIFO[2][i];
     }
-    IST8310_FIFO[0][9] = mpudata->mx;//将新的数据放置到 数据的最后面
-    IST8310_FIFO[1][9] = mpudata->my;
-    IST8310_FIFO[2][9] = mpudata->mz;
+    IST8310_FIFO[0][4] = mpudata->mx;
+    IST8310_FIFO[1][4] = mpudata->my;
+    IST8310_FIFO[2][4] = mpudata->mz;
     
     for(uint8_t j = 0;j<3;j++){
-        for(uint8_t i = 0;i<10;i++){
-            IST8310_FIFO[j][10] += IST8310_FIFO[j][i];
+        for(uint8_t i = 0;i<5;i++){
+            IST8310_FIFO[j][5] += IST8310_FIFO[j][i];
         }
-        IST8310_FIFO[j][10] = IST8310_FIFO[j][10]/10;
+        IST8310_FIFO[j][5] = IST8310_FIFO[j][5]/5;
     }
 }
 
@@ -416,17 +412,17 @@ void imu_get_data(void)
     mpu6500_datasave(&imu.raw);
     IST8310_datasave(&imu.raw);
 
-    imu.raw.ax = (int16_t)MPU6500_FIFO[0][10];
-    imu.raw.ay = (int16_t)MPU6500_FIFO[1][10];
-    imu.raw.az = (int16_t)MPU6500_FIFO[2][10];
+    imu.raw.ax = (int16_t)MPU6500_FIFO[0][5];
+    imu.raw.ay = (int16_t)MPU6500_FIFO[1][5];
+    imu.raw.az = (int16_t)MPU6500_FIFO[2][5];
 
-    imu.raw.gx = (int16_t)MPU6500_FIFO[3][10];
-    imu.raw.gy = (int16_t)MPU6500_FIFO[4][10];
-    imu.raw.gz = (int16_t)MPU6500_FIFO[5][10];
+    imu.raw.gx = (int16_t)MPU6500_FIFO[3][5];
+    imu.raw.gy = (int16_t)MPU6500_FIFO[4][5];
+    imu.raw.gz = (int16_t)MPU6500_FIFO[5][5];
 
-    imu.raw.mx = (int16_t)IST8310_FIFO[0][10];
-    imu.raw.my = (int16_t)IST8310_FIFO[1][10];
-    imu.raw.mz = (int16_t)IST8310_FIFO[2][10];
+    imu.raw.mx = (int16_t)IST8310_FIFO[0][5];
+    imu.raw.my = (int16_t)IST8310_FIFO[1][5];
+    imu.raw.mz = (int16_t)IST8310_FIFO[2][5];
 
     imu.rip.temp = imu.raw.temp * MPU6500_TEMPERATURE_FACTOR + MPU6500_TEMPERATURE_OFFSET;
 
@@ -502,6 +498,7 @@ void mpu_offset_call(void){
     imu.raw.my = (int16_t)IST8310_FIFO[1][10]-imu.offset.my;
     imu.raw.mz = (int16_t)IST8310_FIFO[2][10]-imu.offset.mz;
 }
+
 void mahony_ahrs_updateIMU(imu_ripdata_t const *mpudata)
 {
     float recipNorm;
@@ -901,7 +898,6 @@ static void IMU_temp_Control(double temp)
         }
         tempPWM = (uint16_t)IMUTemperaturePID.output;
         TIM_SetCompare2(TIM3, tempPWM);
-
     }
     else
     {
@@ -915,7 +911,6 @@ static void IMU_temp_Control(double temp)
                 first_temperature = 1;
                 //imuTempPid.Iout = MPU6500_TEMP_PWM_MAX / 2.0f;
             }
-
         }
         TIM_SetCompare2(TIM3, MPU6500_TEMP_PWM_MAX - 1);
     }
@@ -930,15 +925,15 @@ float get_pit_angle(void){
 }
 
 float get_imu_wx(void){
-  return imu.rip.gx * 57.3f;
+    return imu.rip.gx * 57.3f;
 }
 
 float get_imu_wy(void){
-  return imu.rip.gy * 57.3f;
+    return imu.rip.gy * 57.3f;
 }
 
 float get_imu_wz(void){
-  return imu.rip.gz * 57.3f;
+    return imu.rip.gz * 57.3f;
 }
 
 void imu_main(void){
