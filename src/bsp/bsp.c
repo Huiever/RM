@@ -38,7 +38,6 @@ void BSP_Pre_Init(void){
 
     TIM2_Init();
     SPI5_Init();
-    imu_init();
 
     //24输出控制口 初始化
     power_ctrl_configuration();
@@ -73,9 +72,8 @@ void BSP_Init(void)
     delay_ms(100);
     Judge_Init();
     USART6_Init(115200);
-
+    imu_init();
     TIM6_Init();
-
     CAN1_Init();
     CAN2_Init();
     Dbus_Init();

@@ -5,7 +5,7 @@
 #include "flags.h"
 #include "can_bus_task.h"
 #include "imu.h"
-#include "sys.h"
+#include "usart3.h"
 #include "remote_task.h"
 
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;

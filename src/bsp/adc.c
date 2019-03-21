@@ -52,7 +52,6 @@ double get_temprate(void)
 
 static uint16_t get_ADC(uint8_t ch)
 {
-
     ADC_ClearFlag(ADC1,ADC_FLAG_STRT|ADC_FLAG_OVR|ADC_FLAG_EOC);
     ADC_RegularChannelConfig(ADC1, ch, 1, ADC_SampleTime_15Cycles);
 

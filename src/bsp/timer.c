@@ -17,7 +17,6 @@ void TIM3_Init(uint16_t arr, uint16_t psc)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
     GPIO_InitTypeDef GPIO_InitStructure;
-    NVIC_InitTypeDef NVIC_InitStructure;
     TIM_OCInitTypeDef TIM_OCInitStructure;
 
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);

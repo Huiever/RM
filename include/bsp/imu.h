@@ -4,12 +4,14 @@
 
 /* Adjust the Kp and Ki of IMU module
    This can change the convergence speed of the IMU output */
-#define BOARD_DOWN                  (1)
+#define BOARD_DOWN                  1
 #define sampleFreq                  200.0f                  // sample frequency in Hz
 #define twoKpDef                    (40.0f * 0.5f)          // 2 * proportional gain
 #define twoKiDef                    (2.0f * 0.005f)         // 2 * integral gain
-#define AXIS_6                      0
-#define IMU_TEMPERATURE_CONTROL     0
+#define AXIS_6                      1                       // 0--9axis   1--6axis
+#define IMU_TEMPERATURE_CONTROL     0                       //imu温控，可能导致漂移，需测试后使用
+
+#define MAG_SEN 0.3f //转换成 uT
 
 #define MPU6500_NSS_Low() GPIO_WriteBit(GPIOF, GPIO_Pin_6, Bit_RESET)
 #define MPU6500_NSS_High() GPIO_WriteBit(GPIOF, GPIO_Pin_6, Bit_SET)
@@ -51,24 +53,26 @@
 }
 
 typedef struct{
-        float ax; //unit: m/s2
-        float ay;
-        float az;
-        
-        float gx; /*!< omiga, +- 1000dps -> rad/s */
-        float gy;
-        float gz;
-        
-        float mx; //unit: G
-        float my;
-        float mz;
+    float ax; //unit: m/s2
+    float ay;
+    float az;
+    
+    float gx; //rad/s
+    float gy;
+    float gz;
+    
+    float mx; //unit: uT
+    float my;
+    float mz;
 
-        float temp;
-
-        float rol;
-        float pit;
-        float yaw;
+    float temp;
 }imu_ripdata_t;  //处理过的数据
+
+typedef struct{
+    float rol;
+    float pit;
+    float yaw;
+}attitude_angle_t;  //姿态角
 
 typedef struct{
     int16_t ax;
@@ -83,38 +87,39 @@ typedef struct{
     int16_t my;
     int16_t mz;
     
-}imu_offset_t;  //偏移
+}imu_offset_t;      //偏移
 
 typedef struct{
-        int16_t ax;
-        int16_t ay;
-        int16_t az;
-     
-        int16_t temp;
+    int16_t ax;
+    int16_t ay;
+    int16_t az;
+ 
+    int16_t temp;
 
-        int16_t gx;
-        int16_t gy;
-        int16_t gz;
-        
-        int16_t mx;            //unit: mG
-        int16_t my;
-        int16_t mz;
+    int16_t gx;
+    int16_t gy;
+    int16_t gz;
+    
+    int16_t mx;     //unit: mG
+    int16_t my;
+    int16_t mz;
 }imu_rawdata_t;     //原始数据
 
 typedef struct{
+    imu_ripdata_t rip;
+    attitude_angle_t atti;
     imu_rawdata_t raw;
     imu_offset_t  offset;
-    imu_ripdata_t rip;
 } imu_t;
 
-void imu_init(void);
-void imu_main(void);
+extern void imu_init(void);              //imu初始化
+extern void imu_main(void);              //imu获取姿态角主函数
 
-float get_yaw_angle(void);        //获得yaw角度
-float get_pit_angle(void);        //获得pit角度
+extern float get_yaw_angle(void);        //获得yaw角度
+extern float get_pit_angle(void);        //获得pit角度
 
-float get_imu_wx(void);           //roll 角速度 °/s
-float get_imu_wy(void);           //pitch 角速度 °/s
-float get_imu_wz(void);           //yaw 角速度 °/s
+extern float get_imu_wx(void);           //roll 角速度 °/s
+extern float get_imu_wy(void);           //pitch 角速度 °/s
+extern float get_imu_wz(void);           //yaw 角速度 °/s
 
 #endif
