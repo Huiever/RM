@@ -1,5 +1,6 @@
 #include "power.h"
 #include "sys.h"
+#include "delay.h"
 
 void power_ctrl_configuration(void)
 {
@@ -19,7 +20,6 @@ void power_ctrl_configuration(void)
         power_ctrl_off(i);
     }
 }
-
 void power_ctrl_on(uint8_t num)
 {
     if (num > POWER4_CTRL_SWITCH)
@@ -45,4 +45,15 @@ void power_ctrl_toggle(uint8_t num)
         return;
     }
     GPIO_ToggleBits(GPIOH, GPIO_Pin_2 << num);
+}
+
+void power_init(void){
+    //24输出控制口 初始化
+    power_ctrl_configuration();
+
+    //24v 输出 依次上电
+    for (uint8_t i = POWER1_CTRL_SWITCH; i < POWER4_CTRL_SWITCH + 1; i++){
+        power_ctrl_on(i);
+        delay_us(POWER_CTRL_ONE_BY_ONE_TIME);
+    }
 }

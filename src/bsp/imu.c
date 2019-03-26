@@ -11,6 +11,12 @@
 #include "main.h"
 #include "pid_regulator.h"
 #include "stdlib.h"
+
+#define MPU_ID  0x70
+
+float imu_yaw_angle=0;
+float imu_yaw_angular_speed=0;
+float imu_pitch_angular_speed=0;
 //---------------------------------------------------------------------------------------------------
 // Variable definitions
 static volatile float twoKp = twoKpDef;                                           // 2 * proportional gain (Kp)
@@ -21,20 +27,21 @@ volatile float        q1 = 0.0f;
 volatile float        q2 = 0.0f;
 volatile float        q3 = 0.0f;
 
-volatile float gx, gy, gz, ax, ay, az, mx, my, mz;  
+static volatile float gx, gy, gz, ax, ay, az, mx, my, mz;  
 uint8_t mpu_buff[14];  /* buffer to save imu raw data */
 uint8_t ist_buff[6];   /* buffer to save IST8310 raw data */
-uint8_t MPU_id = 0x70;
-imu_t imu = {
-            {0,0,0,0,0,0,0,0,0,0},       //rip
-            {0,0,0},                     //atti
-            {0,0,0,0,0,0,0,0,0,0},       //raw
-            {0,0,0,0,0,0,0,0,0,},        //offset
-            };
 
-float IST8310_FIFO[3][6] = {0};    //[0]-[4]为最近5次数据 [5]为5次数据的平均值 
+ imu_t imu = {
+                    {0,0,0},                     //atti
+                    {0,0,0,0,0,0,0,0,0,0},       //rip
+                    {0,0,0,0,0,0,0,0,0,0},       //raw
+                    {0,0,0,0,0,0,MAG_X_OFFSET,MAG_Y_OFFSET,MAG_Z_OFFSET},         //offset
+                    };
+
+volatile float IST8310_FIFO[3][6] = {0};    //[0]-[4]为最近5次数据 [5]为5次数据的平均值 
                                      //注：磁传感器的采样频率慢，所以单独列出
-
+volatile float GYRO_FIFO[3][6] = {0};
+volatile float YAW_FIFO[6] = {0};
 PID_Regulator_t IMUTemperaturePID = IMU_Temperature_PID_DEFAULT;
 
 void init_quaternion(float hx, float hy);
@@ -150,7 +157,7 @@ uint8_t MPU6500_Init(void){
     
     delay_ms(100);
     
-    if(MPU_id  ==  MPU6500_Read_Reg(MPU6500_WHO_AM_I)){
+    if(MPU_ID  ==  MPU6500_Read_Reg(MPU6500_WHO_AM_I)){
     }
     else{ 
         return 1; //error
@@ -232,7 +239,12 @@ uint8_t IST8310_Init(void){
     delay_ms(100);
     return 0;
 }
-
+/**
+  * @brief          读取ist8310的磁力值
+  * @author         金双平
+  * @param[in]      存储ist8310寄存器值的数组起始地址
+  * @retval         返回空
+  */
 void GetIST8310_RawValues(uint8_t* buff)
 {
     MPU6500_Read_Regs(MPU6500_EXT_SENS_DATA_00,buff,6);
@@ -243,7 +255,7 @@ void GetIST8310_RawValues(uint8_t* buff)
   * @param[in]      转换为国际单位的磁力值的结构体指针
   * @retval         返回空
   */
-void ist8310_moving_average_filter(imu_ripdata_t * mpudata){
+static void ist8310_moving_average_filter(imu_ripdata_t * mpudata){
     static uint8_t count = 0;
 
     for(uint8_t i = 1;i<5;i++){
@@ -271,12 +283,72 @@ void ist8310_moving_average_filter(imu_ripdata_t * mpudata){
     }
 }
 /**
+  * @brief          角速度滑动平均滤波算法
+  * @author         李运环
+  * @param[in]      转换为国际单位的角速度的结构体指针
+  * @retval         返回空
+  */
+static void gyro_moving_average_filter(imu_ripdata_t * mpudata){
+    static uint8_t count = 0;
+
+    for(uint8_t i = 1;i<5;i++){
+        GYRO_FIFO[0][i-1] = GYRO_FIFO[0][i];
+        GYRO_FIFO[1][i-1] = GYRO_FIFO[1][i];
+        GYRO_FIFO[2][i-1] = GYRO_FIFO[2][i];
+    }
+    GYRO_FIFO[0][4] = mpudata->gx;
+    GYRO_FIFO[1][4] = mpudata->gy;
+    GYRO_FIFO[2][4] = mpudata->gz;
+
+    if(count >= 4){
+        for(uint8_t j = 0;j<3;j++){
+            for(uint8_t i = 0;i<5;i++){
+                GYRO_FIFO[j][5] += GYRO_FIFO[j][i];
+            }
+            GYRO_FIFO[j][5] = GYRO_FIFO[j][5]/5;
+        }
+        mpudata->gx = GYRO_FIFO[0][5];
+        mpudata->gy = GYRO_FIFO[1][5];
+        mpudata->gz = GYRO_FIFO[2][5];
+    }
+    else{
+        count++;
+    }
+}
+/**
+  * @brief          yaw角度滑动平均滤波算法
+  * @author         李运环
+  * @param[in]      
+  * @retval         返回空
+  */
+static void yaw_moving_average_filter(float yaw_angle){
+    static uint8_t count = 0;
+
+    for(uint8_t i = 1;i<5;i++){
+        YAW_FIFO [i-1] = YAW_FIFO [i];
+    }
+    YAW_FIFO [4] = yaw_angle;
+
+    if(count >= 4){
+     
+        for(uint8_t i = 0;i<5;i++){
+            YAW_FIFO [5] += YAW_FIFO [i];
+        }
+        YAW_FIFO [5] = YAW_FIFO [5]/5;
+
+        yaw_angle = YAW_FIFO [5];
+    }
+    else{
+        count++;
+    }
+}
+/**
   * @brief          mpu和ist数据减去零漂，并转换为国际单位, 磁力值滑动平均滤波
   * @author         李运环
   * @param[in]      NULL
   * @retval         返回空
   */
-void imu_calibrate_unit_convert(void){
+static void imu_calibrate_unit_convert(void){
 //unit:m/s2
     imu.rip.ax = (float)((imu.raw.ax - imu.offset.ax) * 9.80665f / 16384.0f);
     imu.rip.ay = (float)((imu.raw.ay - imu.offset.ay) * 9.80665f / 16384.0f);
@@ -293,7 +365,8 @@ void imu_calibrate_unit_convert(void){
     imu.rip.mz = (float)((imu.raw.mz - imu.offset.mz) * MAG_SEN);
 
     ist8310_moving_average_filter(&imu.rip);
-    
+    gyro_moving_average_filter(&imu.rip);
+/* 摄氏度 */
     imu.rip.temp = imu.raw.temp * MPU6500_TEMPERATURE_FACTOR + MPU6500_TEMPERATURE_OFFSET;
 }
 /**
@@ -302,7 +375,7 @@ void imu_calibrate_unit_convert(void){
   * @param[in]      转化为国际单位的加速度值的结构体指针
   * @retval         返回空
   */
-void accel_low_pass_filter(imu_ripdata_t * mpudata){
+static void accel_low_pass_filter(imu_ripdata_t * mpudata){
     static uint8_t updata_count=0;
 
     static double accel_fliter_1[3] = {0.0f, 0.0f, 0.0f};
@@ -337,13 +410,12 @@ void accel_low_pass_filter(imu_ripdata_t * mpudata){
     mpudata->ay = accel_fliter_3[1];
     mpudata->az = accel_fliter_3[2];
 }
-
 /**
   * @brief          更新加速度、角速度、磁力值
   * @author         李运环
   * @retval         返回空
   */
-void imu_get_data(void)
+static void imu_get_data(void)
 {
     static uint8_t init_quaternion_flag=0;
     
@@ -376,7 +448,7 @@ void imu_get_data(void)
   * @author         李运环
   * @retval         返回空
   */
-static void get_mpu_accel_gyro_offset(void){
+void get_mpu_accel_gyro_offset(void){
     for (int i = 0; i<300;i++){
         MPU6500_Read_Regs(MPU6500_ACCEL_XOUT_H, mpu_buff, 14);
 
@@ -398,25 +470,25 @@ static void get_mpu_accel_gyro_offset(void){
     imu.offset.gz = imu.offset.gz / 300;
 }
 /**
-  * @brief          获取磁力计的偏移
+  * @brief          获取磁力计的偏移（不理解，不知道能否使用）
   * @author         DJI_RM
   * @retval         返回空
   */
-static void get_ist_mag_offset(void){
+void get_ist_mag_offset(void){
     int16_t mag_max[3], mag_min[3];
     for (int i = 0; i < 1000; i++){
         GetIST8310_RawValues(ist_buff);
         memcpy(&imu.raw.mx, ist_buff, 6);
-    if ((abs(imu.raw.mx) < 400) && (abs(imu.raw.my) < 400) && (abs(imu.raw.mz) < 400)){
-        mag_max[0] = VAL_MAX(mag_max[0], imu.raw.mx);
-        mag_min[0] = VAL_MIN(mag_min[0], imu.raw.mx);
+        if ((abs(imu.raw.mx) < 400) && (abs(imu.raw.my) < 400) && (abs(imu.raw.mz) < 400)){
+            mag_max[0] = VAL_MAX(mag_max[0], imu.raw.mx);
+            mag_min[0] = VAL_MIN(mag_min[0], imu.raw.mx);
 
-        mag_max[1] = VAL_MAX(mag_max[1], imu.raw.my);
-        mag_min[1] = VAL_MIN(mag_min[1], imu.raw.my);
+            mag_max[1] = VAL_MAX(mag_max[1], imu.raw.my);
+            mag_min[1] = VAL_MIN(mag_min[1], imu.raw.my);
 
-        mag_max[2] = VAL_MAX(mag_max[2], imu.raw.mz);
-        mag_min[2] = VAL_MIN(mag_min[2], imu.raw.mz);
-    }
+            mag_max[2] = VAL_MAX(mag_max[2], imu.raw.mz);
+            mag_min[2] = VAL_MIN(mag_min[2], imu.raw.mz);
+        }
     delay_ms(2);
     }
     imu.offset.mx = (int16_t)((mag_max[0] + mag_min[0]) * 0.5f);
@@ -429,7 +501,7 @@ static void get_ist_mag_offset(void){
   * @param[in]      需要计算方根的单精度浮点数
   * @retval         返回空
   */
-float invSqrt(float x) {
+static float invSqrt(float x) {
     float halfx = 0.5f * x;
     float y = x;
     long i = *(long*)&y;
@@ -444,7 +516,7 @@ float invSqrt(float x) {
   * @param[in]      转换成国际单位的加速度、角速度的结构体指针
   * @retval         返回空
   */
-void mahony_ahrs_updateIMU(imu_ripdata_t const *mpudata){
+static void mahony_ahrs_updateIMU(imu_ripdata_t const *mpudata){
     float recipNorm;
     float halfvx, halfvy, halfvz;
     float halfex, halfey, halfez;
@@ -522,7 +594,7 @@ void mahony_ahrs_updateIMU(imu_ripdata_t const *mpudata){
   * @param[in]      转换成国际单位的加速度、角速度、磁力值的结构体指针
   * @retval         返回空
   */
-void mahony_ahrs_update(imu_ripdata_t const *mpudata){
+static void mahony_ahrs_update(imu_ripdata_t const *mpudata){
     float recipNorm;
     float q0q0, q0q1, q0q2, q0q3, q1q1, q1q2, q1q3, q2q2, q2q3, q3q3;
     float hx, hy, bx, bz;
@@ -639,7 +711,7 @@ void mahony_ahrs_update(imu_ripdata_t const *mpudata){
     q3 *= recipNorm;
 }
 /**
-  * @brief          根据磁力计的值更新四元数
+  * @brief          根据磁力计的值初始化四元数
   * @author         DJI_RM
   * @param[in]      读取磁力计的磁力值的结构体
   * @retval         返回空
@@ -793,31 +865,34 @@ void init_quaternion(float hx, float hy){
 #endif
 }
 /**
-  * @brief          根据四元数更新姿态角，并对yaw进行连续化
+  * @brief          根据四元数更新姿态角，并对yaw进行连续化处理
   * @author         李运环
   * @param[in]      NULL
   * @retval         返回空
   */
-void IMU_getYawPitchRoll(attitude_angle_t * atti)
+
+static void IMU_getYawPitchRoll(attitude_angle_t * atti)
 {
-    volatile static float yaw_temp = 0,last_yaw_temp = 0;
-    volatile static int   yaw_count = 0;
+    static float yaw_temp = 0,last_yaw_temp = 0;
+    static int   yaw_count = 0;
     // yaw    -pi----pi
     atti->yaw = atan2(2.0f * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3)* 57.3;
     // pitch  -pi/2--- pi/2
     atti->pit = -asin(2.0f * (q1 * q3 - q0 * q2))* 57.3;
     // roll   -pi-----pi
     atti->rol = atan2(2.0f * (q0 * q1 + q2 * q3), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3)* 57.3;
+
     //yaw数据连续化
     last_yaw_temp = yaw_temp;
     yaw_temp = atti->yaw; 
-    if(yaw_temp - last_yaw_temp>= 330){
+    if(yaw_temp - last_yaw_temp>= 300){
         yaw_count--;
     } 
-    else if (yaw_temp - last_yaw_temp <= -330){
+    else if (yaw_temp - last_yaw_temp <= -300){
         yaw_count++;
     }
     atti->yaw = yaw_temp + yaw_count*360;
+
 }
 /**
   * @brief          获取IMU控制温度，为开机时adc读取的板子温度+10
@@ -840,7 +915,7 @@ static int8_t IMU_GET_CONTROL_TEMPERATURE(void){
     return control_temperature;
 }
 /**
-  * @brief          IMU温度控制
+  * @brief          IMU温度闭环控制
   * @author         李运环
    *@param[in]      读取的mpu6500的温度值，单位：摄氏度
   * @retval         返回空
@@ -873,17 +948,12 @@ static void IMU_temp_Control(double temp){
         TIM_SetCompare2(TIM3, MPU6500_TEMP_PWM_MAX - 1);
     }
 }
-
 /**
   * @brief          mpu6500和ist8310的初始化以及角速度、加速度、磁力值的零漂，通过宏定义决定是否开启IMU温控
   * @author         李运环
   * @retval         返回空
   */
 void imu_init(void){
-#if IMU_TEMPERATURE_CONTROL == 1
-    temperature_ADC_init();
-    TIM3_Init(MPU6500_TEMP_PWM_MAX, 1); //陀螺仪温度控制PWM初始化
-#endif
     while(MPU6500_Init()){
         printf("MPU6500 init error！");//失败进入死循环
         delay_ms(500);
@@ -894,7 +964,11 @@ void imu_init(void){
     delay_ms(5);
     get_mpu_accel_gyro_offset();
     delay_ms(5);
-    get_ist_mag_offset();
+//    get_ist_mag_offset();
+#if IMU_TEMPERATURE_CONTROL == 1
+    temperature_ADC_init();
+    TIM3_Init(MPU6500_TEMP_PWM_MAX, 1); //陀螺仪温度控制PWM初始化
+#endif
 }
 /**
   * @brief          IMU主函数
@@ -904,10 +978,15 @@ void imu_init(void){
 void imu_main(void){
     imu_get_data();
     mahony_ahrs_update(&imu.rip);
+    IMU_getYawPitchRoll(&imu.atti);
+    
+    imu_yaw_angle=imu.atti.yaw;
+    imu_yaw_angular_speed=imu.rip.gz*57.3f;
+    imu_pitch_angular_speed=imu.rip.gy*57.3f;
+    
 #if IMU_TEMPERATURE_CONTROL == 1
     IMU_temp_Control(imu.rip.temp);
 #endif
-    IMU_getYawPitchRoll(&imu.atti);
 #if Monitor_IMU_Angle == 1
     printf("yaw_angle:%8.3lf   pit_angle:%8.3lf  rol_angle:%8.3lf\r\n", imu.atti.yaw, imu.atti.pit, imu.atti.rol);
     delay_ms(5);
@@ -923,7 +1002,7 @@ void imu_main(void){
 }
 
 float get_yaw_angle(void){
-    return imu.atti.yaw;
+    return (float)imu.atti.yaw;
 }
 
 float get_pit_angle(void){
@@ -941,4 +1020,3 @@ float get_imu_wy(void){
 float get_imu_wz(void){
     return imu.rip.gz * 57.3f;
 }
-

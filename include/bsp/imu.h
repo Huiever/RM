@@ -11,7 +11,10 @@
 #define AXIS_6                      1                       // 0--9axis   1--6axis
 #define IMU_TEMPERATURE_CONTROL     0                       //imu温控，可能导致漂移，需测试后使用
 
-#define MAG_SEN 0.3f //转换成 uT
+#define MAG_SEN         0.1f    //转换成 uT
+#define MAG_X_OFFSET    -10     //磁场偏移，采样空间磁场后matlab计算得到
+#define MAG_Y_OFFSET    1
+#define MAG_Z_OFFSET    12
 
 #define MPU6500_NSS_Low() GPIO_WriteBit(GPIOF, GPIO_Pin_6, Bit_RESET)
 #define MPU6500_NSS_High() GPIO_WriteBit(GPIOF, GPIO_Pin_6, Bit_SET)
@@ -106,20 +109,17 @@ typedef struct{
 }imu_rawdata_t;     //原始数据
 
 typedef struct{
-    imu_ripdata_t rip;
     attitude_angle_t atti;
+    imu_ripdata_t rip;
     imu_rawdata_t raw;
     imu_offset_t  offset;
-} imu_t;
+}imu_t;
 
+extern imu_t imu;
 extern void imu_init(void);              //imu初始化
 extern void imu_main(void);              //imu获取姿态角主函数
 
-extern float get_yaw_angle(void);        //获得yaw角度
-extern float get_pit_angle(void);        //获得pit角度
-
-extern float get_imu_wx(void);           //roll 角速度 °/s
-extern float get_imu_wy(void);           //pitch 角速度 °/s
-extern float get_imu_wz(void);           //yaw 角速度 °/s
-
+extern float imu_yaw_angle;              //yaw角度 °
+extern float imu_yaw_angular_speed;      //yaw角速度 °/s
+extern float imu_pitch_angular_speed;    //pitch角速度 °/s
 #endif

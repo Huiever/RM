@@ -8,6 +8,12 @@
 #include "usart3.h"
 #include "remote_task.h"
 
+//#define GET_YAW_ANGLE()     get_yaw_angle()
+#define GET_YAW_ANGLE()           imu_yaw_angle
+//#define GET_YAW_ANGLE()     GMYawEncoder.ecd_angle
+#define GET_YAW_ANGULAR_SPEED     imu_yaw_angular_speed
+#define GET_PITCH_ANGULAR_SPEED   imu_pitch_angular_speed
+
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
 PID_Regulator_t GMPSpeedPID    = GIMBAL_MOTOR_PITCH_SPEED_PID_DEFAULT;
 PID_Regulator_t GMYPositionPID = GIMBAL_MOTOR_YAW_POSITION_PID_DEFAULT;
@@ -40,7 +46,7 @@ void Control_Task(void){
     GMPitchControlLoop();
     GMYawControlLoop();
 #if Monitor_GM_Encoder==0
-//    SetGimbalMotorOutput();
+    SetGimbalMotorOutput();
 #endif
     if(time_tick_1ms % 2 == 0){
         ShootControlLoop();
@@ -119,7 +125,7 @@ void GimbalYawControlModeSwitch(void){
         case PREPARE_STATE:{
             GMYPositionPID.ref = 177.0f;
             GMYPositionPID.fdb = 177.0f;
-            YawAngleSave = GMYawEncoder.ecd_angle;
+            YawAngleSave = GET_YAW_ANGLE();
         }break;
         case CRUISE_STATE:{
             if(CruiseFlag == 0){
@@ -168,7 +174,7 @@ void GimbalYawControlModeSwitch(void){
             
             GimbalAngleLimit();
             GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
-            GMYPositionPID.fdb = GMYawEncoder.ecd_angle;
+            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
         case SHOOT_STATE:{
             if(ShootFlag == 0){
@@ -179,7 +185,7 @@ void GimbalYawControlModeSwitch(void){
             }
             GimbalAngleLimit();
             GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
-            GMYPositionPID.fdb = GMYawEncoder.ecd_angle;
+            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
         case RUNAWAY_STATE:{
             if(RunAwayFlag == 0){
@@ -188,7 +194,7 @@ void GimbalYawControlModeSwitch(void){
                 CruiseFlag=0;
             }
             GMYPositionPID.ref = YawAngleSave;
-            GMYPositionPID.fdb = GMYawEncoder.ecd_angle;
+            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
         case STOP_STATE:{
             
@@ -213,11 +219,12 @@ void GimbalYawControlModeSwitch(void){
             }
             GimbalAngleLimit();
             GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
-            GMYPositionPID.fdb = GMYawEncoder.ecd_angle;
+            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
     }
-    YawAngleSave = GMYawEncoder.ecd_angle;
+    YawAngleSave = GET_YAW_ANGLE();
 }
+
 
 void GMPitchControlLoop(void){
 
@@ -289,23 +296,23 @@ void GMYawControlLoop(void){
 //            GMYSpeedPID.kd = YAW_SPEED_KD_DEFAULTS;
         }break;
     }
-    
+
     GMYPositionPID.Calc(&GMYPositionPID);
     GMYSpeedPID.ref = GMYPositionPID.output;
     
 #if DEBUG_YAW_PID == 2
     static int i=0;
     if(i==4000){
-        GMYSpeedPID.ref = 50;
+        GMYSpeedPID.ref = 100;
     }
     else if(i>=8000){
-        GMYSpeedPID.ref = -50;
+        GMYSpeedPID.ref = -100;
         i=0;
     }
     i++;
 #endif
 
-    GMYSpeedPID.fdb = get_imu_wz();
+    GMYSpeedPID.fdb = GET_YAW_ANGULAR_SPEED;
     GMYSpeedPID.Calc(&GMYSpeedPID);
 }
 
@@ -364,7 +371,6 @@ void ShootControlLoop(void){
         RammerSpeedPID( ( int16_t ) 1000 );
         Set_Rammer_Current( CAN1, (int16_t)RAMMERSpeedPID.output );
     }
-
 }
 
 void RammerSpeedPID( int16_t TargetSpeed){

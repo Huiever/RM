@@ -26,7 +26,10 @@ int main(void){
 //        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, GMYSpeedPID.fdb, GMYSpeedPID.ref);
 //        VisualScope(USART2, RAMMERSpeedPID.fdb,RAMMERSpeedPID.ref,GMYPositionPID.fdb,GMYPositionPID.ref);
 //        VisualScope(USART2, GMPPositionPID.fdb,GMPPositionPID.ref, GMPSpeedPID.fdb, GMPSpeedPID.ref);
+//        VisualScope(USART2, get_imu_wz(),get_imu_wy(), get_yaw_angle(), get_pit_angle());
+//        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, imu.atti.yaw, imu_yaw_angle);
+//        printf("fdb:%f,yaw:%f\r\n",GMYPositionPID.fdb,imu.atti.yaw);
         imu_main();
-        delay_ms(2);
+//        delay_ms(2);
     }
 }

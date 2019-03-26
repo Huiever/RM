@@ -84,7 +84,7 @@ void TIM6_Init(void){
   tim.TIM_Prescaler = 84-1;
   tim.TIM_CounterMode = TIM_CounterMode_Up;
   tim.TIM_ClockDivision = TIM_CKD_DIV1;
-  tim.TIM_Period = 1500;
+  tim.TIM_Period = 1000;
   TIM_TimeBaseInit(TIM6,&tim);
 }
 
@@ -113,12 +113,12 @@ void TIM6_Start(void){
   TIM_ClearFlag(TIM6, TIM_FLAG_Update);
 }
 
-void TIM2_IRQHandler(void){
-  if(TIM_GetITStatus(TIM2,TIM_IT_Update) != RESET){
-    TIM_ClearITPendingBit(TIM2,TIM_IT_Update);
-    TIM_ClearFlag(TIM2, TIM_FLAG_Update);
-  }
-}
+//void TIM2_IRQHandler(void){
+//  if(TIM_GetITStatus(TIM2,TIM_IT_Update) != RESET){
+//    TIM_ClearITPendingBit(TIM2,TIM_IT_Update);
+//    TIM_ClearFlag(TIM2, TIM_FLAG_Update);
+//  }
+//}
 
 void TIM6_DAC_IRQHandler(void){
   if(TIM_GetITStatus(TIM6,TIM_IT_Update) != RESET){

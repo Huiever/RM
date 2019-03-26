@@ -22,9 +22,6 @@
 #include "power.h"
 #include "adc.h"
 
-//四个24v 输出 依次开启 间隔 709us
-#define POWER_CTRL_ONE_BY_ONE_TIME 709
-
 void BSP_Pre_Init(void){
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     
@@ -36,17 +33,10 @@ void BSP_Pre_Init(void){
     USART2_Init(115200);
     USART3_Init(115200);
 
-    TIM2_Init();
+//    TIM2_Init();
     SPI5_Init();
 
-    //24输出控制口 初始化
-    power_ctrl_configuration();
-
-    //24v 输出 依次上电
-    for (uint8_t i = POWER1_CTRL_SWITCH; i < POWER4_CTRL_SWITCH + 1; i++){
-    power_ctrl_on(i);
-    delay_us(POWER_CTRL_ONE_BY_ONE_TIME);
-    }
+    power_init();  //24V电源依次开启
 }
 
 void BSP_Init(void)
@@ -70,9 +60,9 @@ void BSP_Init(void)
 #endif
     Laser_Init();
     delay_ms(100);
+    imu_init();
     Judge_Init();
     USART6_Init(115200);
-    imu_init();
     TIM6_Init();
     CAN1_Init();
     CAN2_Init();
