@@ -31,7 +31,7 @@ static volatile float gx, gy, gz, ax, ay, az, mx, my, mz;
 uint8_t mpu_buff[14];  /* buffer to save imu raw data */
 uint8_t ist_buff[6];   /* buffer to save IST8310 raw data */
 
- imu_t imu = {
+static imu_t imu = {
                     {0,0,0},                     //atti
                     {0,0,0,0,0,0,0,0,0,0},       //rip
                     {0,0,0,0,0,0,0,0,0,0},       //raw
@@ -40,8 +40,6 @@ uint8_t ist_buff[6];   /* buffer to save IST8310 raw data */
 
 volatile float IST8310_FIFO[3][6] = {0};    //[0]-[4]为最近5次数据 [5]为5次数据的平均值 
                                      //注：磁传感器的采样频率慢，所以单独列出
-volatile float GYRO_FIFO[3][6] = {0};
-volatile float YAW_FIFO[6] = {0};
 PID_Regulator_t IMUTemperaturePID = IMU_Temperature_PID_DEFAULT;
 
 void init_quaternion(float hx, float hy);
@@ -282,66 +280,7 @@ static void ist8310_moving_average_filter(imu_ripdata_t * mpudata){
         count++;
     }
 }
-/**
-  * @brief          角速度滑动平均滤波算法
-  * @author         李运环
-  * @param[in]      转换为国际单位的角速度的结构体指针
-  * @retval         返回空
-  */
-static void gyro_moving_average_filter(imu_ripdata_t * mpudata){
-    static uint8_t count = 0;
 
-    for(uint8_t i = 1;i<5;i++){
-        GYRO_FIFO[0][i-1] = GYRO_FIFO[0][i];
-        GYRO_FIFO[1][i-1] = GYRO_FIFO[1][i];
-        GYRO_FIFO[2][i-1] = GYRO_FIFO[2][i];
-    }
-    GYRO_FIFO[0][4] = mpudata->gx;
-    GYRO_FIFO[1][4] = mpudata->gy;
-    GYRO_FIFO[2][4] = mpudata->gz;
-
-    if(count >= 4){
-        for(uint8_t j = 0;j<3;j++){
-            for(uint8_t i = 0;i<5;i++){
-                GYRO_FIFO[j][5] += GYRO_FIFO[j][i];
-            }
-            GYRO_FIFO[j][5] = GYRO_FIFO[j][5]/5;
-        }
-        mpudata->gx = GYRO_FIFO[0][5];
-        mpudata->gy = GYRO_FIFO[1][5];
-        mpudata->gz = GYRO_FIFO[2][5];
-    }
-    else{
-        count++;
-    }
-}
-/**
-  * @brief          yaw角度滑动平均滤波算法
-  * @author         李运环
-  * @param[in]      
-  * @retval         返回空
-  */
-static void yaw_moving_average_filter(float yaw_angle){
-    static uint8_t count = 0;
-
-    for(uint8_t i = 1;i<5;i++){
-        YAW_FIFO [i-1] = YAW_FIFO [i];
-    }
-    YAW_FIFO [4] = yaw_angle;
-
-    if(count >= 4){
-     
-        for(uint8_t i = 0;i<5;i++){
-            YAW_FIFO [5] += YAW_FIFO [i];
-        }
-        YAW_FIFO [5] = YAW_FIFO [5]/5;
-
-        yaw_angle = YAW_FIFO [5];
-    }
-    else{
-        count++;
-    }
-}
 /**
   * @brief          mpu和ist数据减去零漂，并转换为国际单位, 磁力值滑动平均滤波
   * @author         李运环
@@ -365,7 +304,7 @@ static void imu_calibrate_unit_convert(void){
     imu.rip.mz = (float)((imu.raw.mz - imu.offset.mz) * MAG_SEN);
 
     ist8310_moving_average_filter(&imu.rip);
-    gyro_moving_average_filter(&imu.rip);
+//    gyro_moving_average_filter(&imu.rip);
 /* 摄氏度 */
     imu.rip.temp = imu.raw.temp * MPU6500_TEMPERATURE_FACTOR + MPU6500_TEMPERATURE_OFFSET;
 }
@@ -470,7 +409,7 @@ void get_mpu_accel_gyro_offset(void){
     imu.offset.gz = imu.offset.gz / 300;
 }
 /**
-  * @brief          获取磁力计的偏移（不理解，不知道能否使用）
+  * @brief          获取磁力计的偏移（不理解，不知道能否使用，本程序未使用）
   * @author         DJI_RM
   * @retval         返回空
   */
@@ -977,8 +916,8 @@ void imu_init(void){
   */
 void imu_main(void){
     imu_get_data();
-    mahony_ahrs_update(&imu.rip);
-    IMU_getYawPitchRoll(&imu.atti);
+//    mahony_ahrs_update(&imu.rip);
+//    IMU_getYawPitchRoll(&imu.atti);
     
     imu_yaw_angle=imu.atti.yaw;
     imu_yaw_angular_speed=imu.rip.gz*57.3f;
@@ -992,7 +931,7 @@ void imu_main(void){
     delay_ms(5);
 #endif
 #if Monitor_IMU_Gyro == 1
-    printf("wx:%8.3lf  wy:%8.3lf  wz:%8.3lf\r\n", get_imu_wx(), get_imu_wy(), get_imu_wz());
+    printf("wx:%8.3lf  wy:%8.3lf  wz:%8.3lf\r\n", imu.rip.gx * 57.3f, imu.rip.gy * 57.3f, imu.rip.gz * 57.3f);
     delay_ms(5);
 #endif
 #if Monitor_IMU_Mag == 1
@@ -1002,7 +941,7 @@ void imu_main(void){
 }
 
 float get_yaw_angle(void){
-    return (float)imu.atti.yaw;
+    return imu.atti.yaw;
 }
 
 float get_pit_angle(void){

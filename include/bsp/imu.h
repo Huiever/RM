@@ -115,7 +115,6 @@ typedef struct{
     imu_offset_t  offset;
 }imu_t;
 
-extern imu_t imu;
 extern void imu_init(void);              //imu初始化
 extern void imu_main(void);              //imu获取姿态角主函数
 

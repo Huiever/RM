@@ -10,12 +10,11 @@
 #define PWM1  TIM5->CCR1
 #define PWM2  TIM5->CCR2
 
-#define InitFrictionWheel() \
+#define InitOrStopFrictionWheel() \
         PWM1 = 1000;        \
         PWM2 = 1000;
-#define SetFrictionWheelSpeed(x) \
-        PWM1 = x;                \
-        PWM2 = x;
+#define SetFrictionWheelSpeed_1(x)    PWM1 = x;
+#define SetFrictionWheelSpeed_2(x)    PWM2 = x;
 
 #endif
 

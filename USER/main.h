@@ -32,7 +32,7 @@
 #define Monitor_rammer              0
 
 /* Change the encoder offset of pitch/yaw motor */
-#define Pit_Encoder_Offset          1300
+#define Pit_Encoder_Offset          1200
 
 /* Change the max duty of friction wheel,
    which is the max speed of friction wheel */

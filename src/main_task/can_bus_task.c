@@ -26,7 +26,7 @@ void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
     else if(v->diff > 7500){
         v->round_cnt--;
         v->ecd_raw_rate = v->diff - 8192;
-    }        
+    }
     else{
         v->ecd_raw_rate = v->diff;
     }
@@ -36,7 +36,7 @@ void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
     if(v->buf_count == RATE_BUF_SIZE){
         v->buf_count = 0;
     }
-    for(i = 0;i < RATE_BUF_SIZE; i++){
+    for(i = 0; i < RATE_BUF_SIZE; i++){
         temp_sum += v->rate_buf[i];
     }
     v->filter_rate = (int32_t)(temp_sum/RATE_BUF_SIZE);

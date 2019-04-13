@@ -23,13 +23,16 @@ int main(void){
     BSP_Init();
 
     while(1){
-//        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, GMYSpeedPID.fdb, GMYSpeedPID.ref);
+        printf("yaw_raw_value:%6.6d  pit_raw_value:%6.6d  yaw_ecd:%6.6f  pit_ecd:%6.6f\r\n",
+        GMYawEncoder.raw_value, GMPitchEncoder.raw_value,GMYawEncoder.ecd_angle, GMPitchEncoder.ecd_angle);
+
+        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, GMYSpeedPID.fdb, GMYSpeedPID.ref);
 //        VisualScope(USART2, RAMMERSpeedPID.fdb,RAMMERSpeedPID.ref,GMYPositionPID.fdb,GMYPositionPID.ref);
 //        VisualScope(USART2, GMPPositionPID.fdb,GMPPositionPID.ref, GMPSpeedPID.fdb, GMPSpeedPID.ref);
 //        VisualScope(USART2, get_imu_wz(),get_imu_wy(), get_yaw_angle(), get_pit_angle());
 //        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, imu.atti.yaw, imu_yaw_angle);
 //        printf("fdb:%f,yaw:%f\r\n",GMYPositionPID.fdb,imu.atti.yaw);
         imu_main();
-//        delay_ms(2);
+        delay_ms(2);
     }
 }

@@ -1,15 +1,16 @@
 #ifndef _REOMTE_TASK_H_
 #define _REOMTE_TASK_H_
 #include "main.h"
+#include "ramp.h"
 
 #define PITCH_MAX                   35.0f
-#define PITCH_MIN                   -25.0f
+#define PITCH_MIN                   0.0f
 
-#define FRICTION_RAMP_TICK_COUNT    50
+#define FRICTION_RAMP_TICK_COUNT    100
 
 #define REMOTE_CONTROLLER_STICK_OFFSET      1024u
 
-#define STICK_TO_CHASSIS_SPEED_REF_FACT     0.45f
+#define STICK_TO_CHASSIS_SPEED_REF_FACT     0.50f
 #define STICK_TO_PITCH_ANGLE_INC_FACT       0.004f
 #define STICK_TO_YAW_ANGLE_INC_FACT         0.020f
 
@@ -103,6 +104,11 @@ typedef struct{
 }Gimbal_Ref_t;
 
 extern Gimbal_Target_t Gimbal_Target;
+extern int start_friction_flag;
+extern RampGen_t          FrictionRamp1;
+extern RampGen_t          FrictionRamp2;
+extern int  FRICTION_WHEEL_MAX_DUTY;
+extern int first_start_friction;
 
 void RemoteTaskInit(void);
 void GimbalAngleLimit(void);
@@ -132,7 +138,6 @@ int16_t Get_ChassisSpeed_Target(void);
 void RemoteDataProcess(uint8_t *pData);
 void SetControlMode(Remote *rc);
 void Reset_ChassisSpeed_Target(void);
-
 
 
 extern RC_Ctl_t           RC_CtrlData;

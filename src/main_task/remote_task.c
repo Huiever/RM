@@ -6,12 +6,16 @@
 #include "control_task.h"
 #include "stdio.h"
 
+int start_friction_flag = 0;
+int  FRICTION_WHEEL_MAX_DUTY = 1350;
+
 static ControlMode_e controlmode = STOP;
 
 RC_Ctl_t           RC_CtrlData;
 Gimbal_Ref_t       GimbalRef;
 Gimbal_Target_t    Gimbal_Target;
-RampGen_t          FrictionRamp = RAMP_GEN_DAFAULT;
+RampGen_t          FrictionRamp1 = RAMP_GEN_DAFAULT;
+RampGen_t          FrictionRamp2 = RAMP_GEN_DAFAULT;
 
 static  uint8_t Flag_AutoShoot     = 0;
 int16_t t_inversion        = 0;
@@ -21,11 +25,11 @@ int16_t MiniPC_Alive_Count = 0;
 int16_t ChassisSpeed_Target = 0;
 
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
-int FRICTION_WHEEL_MAX_DUTY = 1250;
+
 
 volatile uint8_t upperMonitorOnline = 0;
 static   UpperMonitor_Ctr_t upperMonitorCmd = {0,GIMBAL_CMD_STOP,0,0};
-
+int first_start_friction = 1;
 void UpperMonitorDataProcess(uint8_t *pData){
     static const uint8_t START_UPPER_MONITOR_CTR = 0x00;
     static const uint8_t GIMBAL_MOVETO           = 0x01;
@@ -40,6 +44,7 @@ void UpperMonitorDataProcess(uint8_t *pData){
     static const uint8_t MINIPC_ALIVE            = 0x0F;
     int16_t d1 = *((int16_t *)(pData + 1));
     int16_t d2 = *((int16_t *)(pData + 3));
+    static int first_start_friction = 1;
     if(upperMonitorOnline){
         switch (pData[0]){
             case GIMBAL_MOVETO:{
@@ -59,17 +64,26 @@ void UpperMonitorDataProcess(uint8_t *pData){
             }break;
             
             case START_FRICTION:{
-                upperMonitorCmd.startFriction = 1;
-                SetFrictionWheelSpeed(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp.Calc(&FrictionRamp)); 
-                if(FrictionRamp.IsOverflow(&FrictionRamp)){
-                    RequestFinishFrictionSpeedUp();
+                if(first_start_friction == 1){
+                    FrictionRamp1.ResetCounter(&FrictionRamp1);
+                    FrictionRamp2.ResetCounter(&FrictionRamp2);
+                    first_start_friction = 0;
                 }
+                SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
+                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+                    SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
+                    if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
+                        RequestFinishFrictionSpeedUp();
+                    }
+                }
+                upperMonitorCmd.startFriction = 1;
             }break;
                 
             case STOP_FRICTION:{
                 upperMonitorCmd.startFriction = 0;
-                SetFrictionWheelSpeed(1000);
-                FrictionRamp.ResetCounter(&FrictionRamp);
+                InitOrStopFrictionWheel();
+                FrictionRamp1.ResetCounter(&FrictionRamp1);
+                FrictionRamp2.ResetCounter(&FrictionRamp2);
             }break;
             
             case START_SHOOTING:{
@@ -160,8 +174,10 @@ uint8_t GetUpperMonitorOnline(void){
 void ResetUpperMonitorCmd(void){
     upperMonitorCmd.d1 = 0;
     upperMonitorCmd.d2 = 0;
-    SetFrictionWheelSpeed(1000);
-    FrictionRamp.ResetCounter(&FrictionRamp);
+    SetFrictionWheelSpeed_1(1000);
+    SetFrictionWheelSpeed_2(1000);
+    FrictionRamp1.ResetCounter(&FrictionRamp1);
+    FrictionRamp2.ResetCounter(&FrictionRamp2);
     Set_Flag_AutoShoot(0);
     SetUpperMonitorOnline(0);
     SetWorkState(CRUISE_STATE);
@@ -204,7 +220,7 @@ void RemoteDataProcess(uint8_t *pData){
             RC_CtrlData.key.v   = ((int16_t)pData[14]) | ((int16_t)pData[15] << 8);
             SetControlMode(&RC_CtrlData.rc);
             if(GetWorkState() == CONTROL_STATE){
-                ChassisSpeed_Target = (RC_CtrlData.rc.ch1 - 1024) * 10;
+                ChassisSpeed_Target = (RC_CtrlData.rc.ch1 - 1024) * 20;
 #if DEBUG_YAW_PID == 0 && DEBUG_PITCH_PID == 0
                 Gimbal_Target.pitch_angle_target += (float)(RC_CtrlData.rc.ch3 - (int16_t)REMOTE_CONTROLLER_STICK_OFFSET)
                                                     * STICK_TO_PITCH_ANGLE_INC_FACT;
@@ -212,20 +228,26 @@ void RemoteDataProcess(uint8_t *pData){
                                                     * STICK_TO_YAW_ANGLE_INC_FACT;
 #endif
                 if( RC_CtrlData.rc.s1 == 1 ){
-                    SetFrictionWheelSpeed(1000);
                     Set_Flag_AutoShoot(0);
+                    InitOrStopFrictionWheel();
+                    FrictionRamp1.ResetCounter(&FrictionRamp1);
+                    FrictionRamp2.ResetCounter(&FrictionRamp2);
                 }
                 else if( RC_CtrlData.rc.s1 == 3 ){
-                    SetFrictionWheelSpeed(1250);
+                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
+                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
+                    }
                     Set_Flag_AutoShoot(0);
                 }
                 else{
-                    SetFrictionWheelSpeed(1250);
+                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
+                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
+                    }
                     Set_Flag_AutoShoot(1);
                 }
             }
-
-            GimbalAngleLimit();
         }
     }
 }
@@ -264,8 +286,10 @@ void Reset_ChassisSpeed_Target(void){
 }
 
 void RemoteTaskInit(void){
-  FrictionRamp.SetScale(&FrictionRamp, FRICTION_RAMP_TICK_COUNT);
-  FrictionRamp.ResetCounter(&FrictionRamp);
+  FrictionRamp1.SetScale(&FrictionRamp1, FRICTION_RAMP_TICK_COUNT);
+  FrictionRamp1.ResetCounter(&FrictionRamp1);
+  FrictionRamp2.SetScale(&FrictionRamp2, FRICTION_RAMP_TICK_COUNT);
+  FrictionRamp2.ResetCounter(&FrictionRamp2);
   Gimbal_Target.pitch_angle_target = 0.0f;
   Gimbal_Target.yaw_angle_target   = 0.0f;
   SetFrictionState(FRICTION_WHEEL_OFF);
