@@ -35,7 +35,7 @@ static imu_t imu = {
                     {0,0,0},                     //atti
                     {0,0,0,0,0,0,0,0,0,0},       //rip
                     {0,0,0,0,0,0,0,0,0,0},       //raw
-                    {0,0,0,0,0,0,MAG_X_OFFSET,MAG_Y_OFFSET,MAG_Z_OFFSET},         //offset
+                    {ACC_X_OFFSET,ACC_Y_OFFSET,ACC_Z_OFFSET,GYRO_X_OFFSET,GYRO_Y_OFFSET,GYRO_Z_OFFSET,MAG_X_OFFSET,MAG_Y_OFFSET,MAG_Z_OFFSET},         //offset
                     };
 
 volatile float IST8310_FIFO[3][6] = {0};    //[0]-[4]为最近5次数据 [5]为5次数据的平均值 
@@ -838,21 +838,21 @@ static void IMU_getYawPitchRoll(attitude_angle_t * atti)
   * @author         李运环
   * @retval         返回空
   */
-static int8_t IMU_GET_CONTROL_TEMPERATURE(void){
-    static int8_t control_temperature = 0;
-    static uint8_t count=0;
-    if(count==0){
-        control_temperature = (int8_t)(get_temprate()) + 10;
-        if (control_temperature > (int8_t)(GYRO_CONST_MAX_TEMP)){
-            control_temperature = (int8_t)(GYRO_CONST_MAX_TEMP);
-        }
-        count=1;
-    }
-//    printf("control_temperature:%5d，imu_temperature:%5.3f\r\n", control_temperature,imu.atti.temp);
-    printf("%8.3lf,%5d，%5.3f\r\n",imu.atti.yaw, control_temperature,imu.rip.temp);
-    delay_ms(5);
-    return control_temperature;
-}
+//static int8_t IMU_GET_CONTROL_TEMPERATURE(void){
+//    static int8_t control_temperature = 0;
+//    static uint8_t count=0;
+//    if(count==0){
+//        control_temperature = (int8_t)(get_temprate()) + 10;
+//        if (control_temperature > (int8_t)(GYRO_CONST_MAX_TEMP)){
+//            control_temperature = (int8_t)(GYRO_CONST_MAX_TEMP);
+//        }
+//        count=1;
+//    }
+////    printf("control_temperature:%5d，imu_temperature:%5.3f\r\n", control_temperature,imu.atti.temp);
+//    printf("%8.3lf,%5d，%5.3f\r\n",imu.atti.yaw, control_temperature,imu.rip.temp);
+//    delay_ms(5);
+//    return control_temperature;
+//}
 /**
   * @brief          IMU温度闭环控制
   * @author         李运环
@@ -864,7 +864,7 @@ static void IMU_temp_Control(double temp){
     static uint8_t first_temperature = 0;
     static uint8_t temp_constant_time = 0 ;
     if (first_temperature){
-        IMUTemperaturePID.ref = IMU_GET_CONTROL_TEMPERATURE();
+        IMUTemperaturePID.ref = IMU_CONTROL_TEMPERATURE;
         IMUTemperaturePID.fdb = temp;
         IMUTemperaturePID.Calc(&IMUTemperaturePID);
         
@@ -876,7 +876,7 @@ static void IMU_temp_Control(double temp){
     }
     else{
         //在没有达到设置的温度，一直最大功率加热
-        if (temp > IMU_GET_CONTROL_TEMPERATURE()){
+        if (temp > IMU_CONTROL_TEMPERATURE){
             temp_constant_time ++;
             if(temp_constant_time > 50){
                 //达到设置温度，将积分项设置为一半最大功率，加速收敛
@@ -901,7 +901,7 @@ void imu_init(void){
     delay_ms(5);
     IST8310_Init();
     delay_ms(5);
-    get_mpu_accel_gyro_offset();
+//    get_mpu_accel_gyro_offset();
     delay_ms(5);
 //    get_ist_mag_offset();
 #if IMU_TEMPERATURE_CONTROL == 1
@@ -915,14 +915,12 @@ void imu_init(void){
   * @retval         返回空
   */
 void imu_main(void){
-    imu_get_data();
-//    mahony_ahrs_update(&imu.rip);
-//    IMU_getYawPitchRoll(&imu.atti);
-    
+    imu_get_data();                                                                                                                 
+    mahony_ahrs_update(&imu.rip);
+    IMU_getYawPitchRoll(&imu.atti);
     imu_yaw_angle=imu.atti.yaw;
     imu_yaw_angular_speed=imu.rip.gz*57.3f;
     imu_pitch_angular_speed=imu.rip.gy*57.3f;
-    
 #if IMU_TEMPERATURE_CONTROL == 1
     IMU_temp_Control(imu.rip.temp);
 #endif

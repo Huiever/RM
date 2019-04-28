@@ -8,7 +8,7 @@
 
 int start_friction_flag = 0;
 int  FRICTION_WHEEL_MAX_DUTY = 1350;
-
+static package_t package = { 0x0a,0x0d,0x11,0x00,0x00,0x00,0x00,0x0d,0x0a };
 static ControlMode_e controlmode = STOP;
 
 RC_Ctl_t           RC_CtrlData;
@@ -27,12 +27,20 @@ int16_t ChassisSpeed_Target = 0;
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
 
+void miniPC_ACK_status(void){
+    package.cmdid = 0x11;
+    package.data[0] = 0xff; 
+    package.data[1] = 0xff;
+    package.data[2] = GET_PITCH_ANGLE;
+    USART6_Print((uint8_t*)&package, 9);
+}
+
 volatile uint8_t upperMonitorOnline = 0;
 static   UpperMonitor_Ctr_t upperMonitorCmd = {0,GIMBAL_CMD_STOP,0,0};
 int first_start_friction = 1;
 void UpperMonitorDataProcess(uint8_t *pData){
     static const uint8_t START_UPPER_MONITOR_CTR = 0x00;
-    static const uint8_t GIMBAL_MOVETO           = 0x01;
+    static const uint8_t SEND_STATUS             = 0x01;
     static const uint8_t GIMBAL_MOVEBY           = 0x02;
     static const uint8_t GIMBAL_TURN_BACK        = 0x03;
     static const uint8_t START_FRICTION          = 0x04;
@@ -45,12 +53,12 @@ void UpperMonitorDataProcess(uint8_t *pData){
     int16_t d1 = *((int16_t *)(pData + 1));
     int16_t d2 = *((int16_t *)(pData + 3));
     static int first_start_friction = 1;
+    static int count = 0;
+    
     if(upperMonitorOnline){
         switch (pData[0]){
-            case GIMBAL_MOVETO:{
-                upperMonitorCmd.d1 = d1 * 0.01f;
-                upperMonitorCmd.d2 = d2 * 0.01f;
-                upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVETO;
+            case SEND_STATUS:{
+                miniPC_ACK_status();
             }break;
             
             case GIMBAL_MOVEBY:{
@@ -64,26 +72,35 @@ void UpperMonitorDataProcess(uint8_t *pData){
             }break;
             
             case START_FRICTION:{
-                if(first_start_friction == 1){
-                    FrictionRamp1.ResetCounter(&FrictionRamp1);
-                    FrictionRamp2.ResetCounter(&FrictionRamp2);
-                    first_start_friction = 0;
-                }
-                SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
-                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-                    SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
-                    if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
-                        RequestFinishFrictionSpeedUp();
-                    }
-                }
+//                if(first_start_friction == 1){
+//                    FrictionRamp1.ResetCounter(&FrictionRamp1);
+//                    FrictionRamp2.ResetCounter(&FrictionRamp2);
+//                    first_start_friction = 0;
+//                }
+//                SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
+//                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+//                    SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
+//                    if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
+//                        count++;
+//                        if(count <= 5){
+//                            RequestFinishFrictionSpeedUp();
+//                            count = 6;
+//                        }
+//                        else{
+//                            count = 6;
+//                        }
+//                    }
+//                }
+                SetFrictionState(FRICTION_WHEEL_ON);
                 upperMonitorCmd.startFriction = 1;
             }break;
                 
             case STOP_FRICTION:{
+                SetFrictionState(FRICTION_WHEEL_OFF);
                 upperMonitorCmd.startFriction = 0;
-                InitOrStopFrictionWheel();
-                FrictionRamp1.ResetCounter(&FrictionRamp1);
-                FrictionRamp2.ResetCounter(&FrictionRamp2);
+//                InitOrStopFrictionWheel();
+//                FrictionRamp1.ResetCounter(&FrictionRamp1);
+//                FrictionRamp2.ResetCounter(&FrictionRamp2);
             }break;
             
             case START_SHOOTING:{
@@ -229,22 +246,25 @@ void RemoteDataProcess(uint8_t *pData){
 #endif
                 if( RC_CtrlData.rc.s1 == 1 ){
                     Set_Flag_AutoShoot(0);
-                    InitOrStopFrictionWheel();
-                    FrictionRamp1.ResetCounter(&FrictionRamp1);
-                    FrictionRamp2.ResetCounter(&FrictionRamp2);
+                    SetFrictionState(FRICTION_WHEEL_OFF);
+//                    InitOrStopFrictionWheel();
+//                    FrictionRamp1.ResetCounter(&FrictionRamp1);
+//                    FrictionRamp2.ResetCounter(&FrictionRamp2);
                 }
                 else if( RC_CtrlData.rc.s1 == 3 ){
-                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
-                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
-                    }
+//                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
+//                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+//                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
+//                    }
+                    SetFrictionState(FRICTION_WHEEL_ON);
                     Set_Flag_AutoShoot(0);
                 }
                 else{
-                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
-                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
-                    }
+//                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
+//                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+//                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
+//                    }
+                    SetFrictionState(FRICTION_WHEEL_ON);
                     Set_Flag_AutoShoot(1);
                 }
             }
@@ -285,12 +305,13 @@ void Reset_ChassisSpeed_Target(void){
     ChassisSpeed_Target = 0;
 }
 
+
 void RemoteTaskInit(void){
   FrictionRamp1.SetScale(&FrictionRamp1, FRICTION_RAMP_TICK_COUNT);
   FrictionRamp1.ResetCounter(&FrictionRamp1);
   FrictionRamp2.SetScale(&FrictionRamp2, FRICTION_RAMP_TICK_COUNT);
   FrictionRamp2.ResetCounter(&FrictionRamp2);
-  Gimbal_Target.pitch_angle_target = 0.0f;
-  Gimbal_Target.yaw_angle_target   = 0.0f;
+  Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
+  Gimbal_Target.yaw_angle_target   = YAW_INIT_ANGLE;
   SetFrictionState(FRICTION_WHEEL_OFF);
 }

@@ -3,15 +3,16 @@
 #include "can1.h"
 #include "main.h"
 
-static uint32_t can_count = 0;
-
 volatile Encoder GMYawEncoder   = {0,0,0,0,0,0,0,0,0};
 volatile Encoder GMPitchEncoder = {0,0,0,0,0,0,Pit_Encoder_Offset,0,0};
 
 volatile rammer Rammer = { 0, 0, 0 };
 
 volatile uint16_t Sentry_HeatData    = 0;
+volatile float Sentry_BulletSpeed = 0;
 volatile uint8_t  Flag_In_RunAwayState = 0;
+
+
 
 void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
     int i = 0;
@@ -43,21 +44,14 @@ void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
 }
 
 void CanReceiveMsgProcess(CanRxMsg * msg){
-    can_count++;
+    volatile static uint32_t bullet_speed[1] = {0};
+    
     switch(msg->StdId){
         case CAN_BUS1_Yaw_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMYawEncoder, msg);
         }break;
         case CAN_BUS1_Pitch_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMPitchEncoder, msg);
-//            if(can_count>=90 && can_count<=100){
-//                if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) <-4000){
-//                    GMPitchEncoder.ecd_bias = Pit_Encoder_Offset + 8192;
-//                }
-//                else if((GMPitchEncoder.ecd_bias - GMPitchEncoder.ecd_value) > 4000){
-//                    GMPitchEncoder.ecd_bias = Pit_Encoder_Offset - 8192;
-//                }
-//            }
         }break;
         case CAN_BUS1_Rammer_FEEDBACK_MSG_ID:{
             Rammer.angle  = msg->Data[0] << 8 | msg->Data[1];
@@ -65,8 +59,11 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
             Rammer.torque = msg->Data[4] << 8 | msg->Data[5];
         }break;
         case ChassisSensor_ID:{
-            Sentry_HeatData    = msg->Data[0]<<8 | msg->Data[1];
-            Flag_In_RunAwayState = msg->Data[2];
+            Sentry_HeatData = msg->Data[0]<<8 | msg->Data[1];
+//            *bullet_speed = (msg->Data[2]<<24 | msg->Data[3]<<16 | msg->Data[4]<<8 | msg->Data[5]);
+//            Sentry_BulletSpeed = *((float *)bullet_speed);
+            Sentry_BulletSpeed = msg->Data[2]<<8 | msg->Data[3];
+            Flag_In_RunAwayState = msg->Data[6];
         }
         default:{
             
@@ -133,6 +130,9 @@ void Send_Gimbal_Info(uint8_t Flag_Shoot_State, uint8_t Control_Mode, int16_t Ch
     tx_message.Data[6] = 0x00;
     tx_message.Data[7] = 0x00;
     CAN_Transmit(CAN1,&tx_message);
+}
+float Get_Sentry_BulletSpeed(void){
+    return Sentry_BulletSpeed / 100.0f;
 }
 
 uint16_t Get_Sentry_HeatData(void){

@@ -40,6 +40,34 @@ void UART6_PrintCh(uint8_t ch){
   FIFO_S_Put(UART_TranFifo, ch);
   USART_ITConfig(USART6, USART_IT_TXE, ENABLE);
 }
+void USART6_sendChar(uint8_t ch) {
+    while ((USART6->SR & 0X40) == 0);
+    USART6->DR = (u8)ch;
+}
+void USART6_Print(uint8_t* ch, int len) {
+    for (int i = 0; i < len; i++) {
+        USART6_sendChar((u8)ch[i]);
+    }
+}
+
+
+void UART6_Print_Status(int8_t const pitch_angle){
+    FIFO_S_Put(UART_TranFifo, 0x0a);
+    FIFO_S_Put(UART_TranFifo, 0x0d);
+    
+    FIFO_S_Put(UART_TranFifo, 0x11);
+    
+    FIFO_S_Put(UART_TranFifo, 0xff);
+    FIFO_S_Put(UART_TranFifo, 0xff);
+    FIFO_S_Put(UART_TranFifo, pitch_angle);
+    FIFO_S_Put(UART_TranFifo, 0xff);
+
+    FIFO_S_Put(UART_TranFifo, 0x0d);
+    FIFO_S_Put(UART_TranFifo, 0x0a);
+    
+    USART_ITConfig(USART6, USART_IT_TXE, ENABLE);
+}
+
 
 void USART6_IRQHandler(void){
   if(USART_GetITStatus(USART6, USART_IT_TXE) != RESET){

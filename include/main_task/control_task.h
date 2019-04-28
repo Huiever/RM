@@ -3,13 +3,14 @@
 
 #include "main.h"
 #include "pid_regulator.h"
+#include "can_bus_task.h"
 
 #define PREPARE_TIME_TICK_MS      4000
 #define YAW_POSITION_KP_DEFAULTS  10
 #define YAW_POSITION_KI_DEFAULTS  0
 #define YAW_POSITION_KD_DEFAULTS  0
 
-#define YAW_SPEED_KP_DEFAULTS  5
+#define YAW_SPEED_KP_DEFAULTS  10
 #define YAW_SPEED_KI_DEFAULTS  0
 #define YAW_SPEED_KD_DEFAULTS  0
 
@@ -17,7 +18,7 @@
 #define PITCH_POSITION_KI_DEFAULTS  0.3
 #define PITCH_POSITION_KD_DEFAULTS  0
 
-#define PITCH_SPEED_KP_DEFAULTS  5
+#define PITCH_SPEED_KP_DEFAULTS  10
 #define PITCH_SPEED_KI_DEFAULTS  0
 #define PITCH_SPEED_KD_DEFAULTS  0
 
@@ -25,8 +26,15 @@
 #define RAMMER_SPEED_KI_DEFAULTS  0
 #define RAMMER_SPEED_KD_DEFAULTS  0 
 
-#define GIMBAL_YAW_CRUISE_DELTA 4.0f
+#define GIMBAL_YAW_CRUISE_DELTA 1.5f
 #define GIMBAL_PITCH_CRUISE_DELTA 1.0f
+
+//#define GET_YAW_ANGLE()           get_yaw_angle()
+//#define GET_YAW_ANGLE()           imu_yaw_angle
+#define GET_YAW_ANGLE()           GMYawEncoder.ecd_angle
+#define GET_YAW_ANGULAR_SPEED     imu_yaw_angular_speed
+#define GET_PITCH_ANGLE           GMPitchEncoder.ecd_angle
+#define GET_PITCH_ANGULAR_SPEED   -imu_pitch_angular_speed
 
 typedef enum{
     PREPARE_STATE,
@@ -177,10 +185,6 @@ void RammerSpeedPID( int16_t TargetSpeed);
 void BigSymbolRecgShootControl(void);
 uint8_t RammerHeatControl(void);
 
-void GMP_PID_PLUS(int x,int y);
-void GMP_PID_MIN(int x,int y);
-void GMY_PID_PLUS(int x,int y);
-void GMY_PID_MIN(int x,int y);
-void RAMMER_PID_PLUS(int x,int y);
-void RAMMER_PID_MIN(int x,int y);
+extern int8_t available_bullet_num ;
+extern int8_t launched_bullet_num ;
 #endif

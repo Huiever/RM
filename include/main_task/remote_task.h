@@ -3,10 +3,12 @@
 #include "main.h"
 #include "ramp.h"
 
-#define PITCH_MAX                   35.0f
-#define PITCH_MIN                   0.0f
+#define PITCH_MAX                   0.0f
+#define PITCH_MIN                   -40.0f
+#define PITCH_INIT_ANGLE            -20.0f
+#define YAW_INIT_ANGLE              0.0f
 
-#define FRICTION_RAMP_TICK_COUNT    100
+#define FRICTION_RAMP_TICK_COUNT    300                
 
 #define REMOTE_CONTROLLER_STICK_OFFSET      1024u
 
@@ -27,6 +29,16 @@ else\
 {\
     val = val;\
 }
+
+typedef struct {
+    uint8_t start1;
+    uint8_t start2;
+    uint8_t cmdid;
+    uint8_t data[4];
+    uint8_t end1;
+    uint8_t end2;
+}package_t;
+
 
 typedef __packed struct{
     int16_t ch0;
@@ -72,8 +84,7 @@ typedef struct{
 
 typedef enum{
     FRICTION_WHEEL_OFF = 0,
-    FRICTION_WHEEL_START_TURNNING = 1,
-    FRICTION_WHEEL_ON = 2,
+    FRICTION_WHEEL_ON = 1,
 }FrictionWheelState_e;
 
 typedef enum{

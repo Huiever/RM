@@ -9,7 +9,16 @@
 #define twoKpDef                    (40.0f * 0.5f)          // 2 * proportional gain
 #define twoKiDef                    (2.0f * 0.005f)         // 2 * integral gain
 #define AXIS_6                      1                       // 0--9axis   1--6axis
-#define IMU_TEMPERATURE_CONTROL     0                       //imu温控，可能导致漂移，需测试后使用
+#define IMU_TEMPERATURE_CONTROL     1                       //imu温控，可能导致漂移，需测试后使用
+#define IMU_CONTROL_TEMPERATURE     40                      //imu控制温度
+
+#define ACC_X_OFFSET    -1530   //
+#define ACC_Y_OFFSET    115
+#define ACC_Z_OFFSET    1343
+
+#define GYRO_X_OFFSET    15     //
+#define GYRO_Y_OFFSET    87
+#define GYRO_Z_OFFSET    30
 
 #define MAG_SEN         0.1f    //转换成 uT
 #define MAG_X_OFFSET    -10     //磁场偏移，采样空间磁场后matlab计算得到
@@ -25,7 +34,7 @@
 #define MPU6500_TEMPERATURE_FACTOR 0.002f
 #define MPU6500_TEMPERATURE_OFFSET 23.0f
 
-#define MPU6500_TEMPERATURE_PID_KP 1700.0f //温度控制PID的kp
+#define MPU6500_TEMPERATURE_PID_KP 1600.0f //温度控制PID的kp
 #define MPU6500_TEMPERATURE_PID_KI 0.2f    //温度控制PID的ki
 #define MPU6500_TEMPERATURE_PID_KD 0.0f    //温度控制PID的kd
 

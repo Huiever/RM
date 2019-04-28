@@ -58,7 +58,7 @@ void BSP_Init(void)
     SetFrictionWheelSpeed(1000);
     delay_ms(3000);
 #endif
-    Laser_Init();
+//    Laser_Init();
     delay_ms(100);
     imu_init();
 //    Judge_Init();

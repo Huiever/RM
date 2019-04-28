@@ -23,9 +23,9 @@ int main(void){
     BSP_Init();
 
     while(1){
-        printf("yaw_raw_value:%6.6d  pit_raw_value:%6.6d  yaw_ecd:%6.6f  pit_ecd:%6.6f\r\n",
-        GMYawEncoder.raw_value, GMPitchEncoder.raw_value,GMYawEncoder.ecd_angle, GMPitchEncoder.ecd_angle);
-
+//        printf("yaw_raw_value:%6.6d  pit_raw_value:%6.6d  yaw_ecd:%6.6f  pit_ecd:%6.6f\r\n",
+//        GMYawEncoder.raw_value, GMPitchEncoder.raw_value,GMYawEncoder.ecd_angle, GMPitchEncoder.ecd_angle);
+//        printf("heat:%d, bullet_speed:%f  %d, %d\r\n",Get_Sentry_HeatData(),Get_Sentry_BulletSpeed(),available_bullet_num, launched_bullet_num);
         VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, GMYSpeedPID.fdb, GMYSpeedPID.ref);
 //        VisualScope(USART2, RAMMERSpeedPID.fdb,RAMMERSpeedPID.ref,GMYPositionPID.fdb,GMYPositionPID.ref);
 //        VisualScope(USART2, GMPPositionPID.fdb,GMPPositionPID.ref, GMPSpeedPID.fdb, GMPSpeedPID.ref);

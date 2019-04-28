@@ -28,11 +28,14 @@
 /* Monitor the encoder offset of pitch/yaw motor */
 #define Monitor_GM_Encoder          0
 
+/* disable yaw pitch move*/
+#define DISABLE_GIMBLA_OUTPUT       0
+
 /* Monitor the encoder offset of rammer motor */
 #define Monitor_rammer              0
 
 /* Change the encoder offset of pitch/yaw motor */
-#define Pit_Encoder_Offset          1200
+#define Pit_Encoder_Offset          5870
 
 /* Change the max duty of friction wheel,
    which is the max speed of friction wheel */

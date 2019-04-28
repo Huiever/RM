@@ -10,11 +10,7 @@
 #include "main.h"
 #include "gun.h"
 
-//#define GET_YAW_ANGLE()           get_yaw_angle()
-//#define GET_YAW_ANGLE()           imu_yaw_angle
-#define GET_YAW_ANGLE()           GMYawEncoder.ecd_angle
-#define GET_YAW_ANGULAR_SPEED     imu_yaw_angular_speed
-#define GET_PITCH_ANGULAR_SPEED   -imu_pitch_angular_speed
+
 
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
 PID_Regulator_t GMPSpeedPID    = GIMBAL_MOTOR_PITCH_SPEED_PID_DEFAULT;
@@ -34,6 +30,9 @@ RampGen_t GMYawRamp   = RAMP_GEN_DAFAULT;
 
 static uint32_t time_tick_1ms = 0;
 
+void heat_control(volatile int16_t const current_heat, volatile float const current_velocity);
+void friction_control(void);
+
 void Control_Task(void){
     time_tick_1ms++;
     WorkStateFSM();
@@ -47,10 +46,11 @@ void Control_Task(void){
     GimbalYawControlModeSwitch();
     GMPitchControlLoop();
     GMYawControlLoop();
-#if Monitor_GM_Encoder==0
+#if Monitor_GM_Encoder == 0 || DISABLE_GIMBLA_OUTPUT == 1
     SetGimbalMotorOutput();
 #endif
     if(time_tick_1ms % 2 == 0){
+        friction_control();
         ShootControlLoop();
     }
     else{
@@ -75,6 +75,7 @@ void WorkStateFSM(void){
             if(GetControlMode() == REMOTE_CONTROL){
                 workState = CONTROL_STATE;
             }
+
         }break;
         case SHOOT_STATE:{
             if(GetUpperMonitorOnline() == 0){
@@ -143,19 +144,19 @@ void GimbalYawControlModeSwitch(void){
             if(Cruise_Time_Between > 10){
                 Gimbal_Target.yaw_angle_target += GIMBAL_YAW_CRUISE_DELTA;
 
-//                if(pitch_dowm_flag == 1){
-//                    Gimbal_Target.pitch_angle_target -= GIMBAL_PITCH_CRUISE_DELTA;
-//                }
-//                else{
-//                    Gimbal_Target.pitch_angle_target += GIMBAL_PITCH_CRUISE_DELTA;
-//                }
-//                
-//                if(Gimbal_Target.pitch_angle_target > PITCH_MAX-5){
-//                    pitch_dowm_flag = 1;
-//                }
-//                if(Gimbal_Target.pitch_angle_target < PITCH_MIN+5){
-//                    pitch_dowm_flag = 0;
-//                }
+                if(pitch_dowm_flag == 1){
+                    Gimbal_Target.pitch_angle_target -= GIMBAL_PITCH_CRUISE_DELTA;
+                }
+                else{
+                    Gimbal_Target.pitch_angle_target += GIMBAL_PITCH_CRUISE_DELTA;
+                }
+                
+                if(Gimbal_Target.pitch_angle_target > PITCH_MAX-5){
+                    pitch_dowm_flag = 1;
+                }
+                if(Gimbal_Target.pitch_angle_target < PITCH_MIN+5){
+                    pitch_dowm_flag = 0;
+                }
 
                 Cruise_Time_Between=0;
             }
@@ -238,19 +239,20 @@ void GMPitchControlLoop(void){
     Gimbal_Target.pitch_angle_target = 0;
 #endif
     GimbalAngleLimit();
+    
     GMPPositionPID.ref = Gimbal_Target.pitch_angle_target;
     GMPPositionPID.fdb = GMPitchEncoder.ecd_angle * GMPitchRamp.Calc(&GMPitchRamp);
     GMPPositionPID.Calc(&GMPPositionPID);
+    
     GMPSpeedPID.ref = GMPPositionPID.output;
-#if DEBUG_PICTH_PID == 2
-        GMPSpeedPID.ref = 0;
-#endif
+//    GMPSpeedPID.ref = 0;
     GMPSpeedPID.fdb = GET_PITCH_ANGULAR_SPEED;
     GMPSpeedPID.Calc(&GMPSpeedPID);
 }
 
 void GMYawControlLoop(void){
     GMYPositionPID.Calc(&GMYPositionPID);
+    
     GMYSpeedPID.ref = GMYPositionPID.output;
 
 #if DEBUG_YAW_PID == 2
@@ -273,7 +275,7 @@ void GMYawControlLoop(void){
 void SetGimbalMotorOutput(void){
     Set_Gimbal_Current(CAN1, -(int16_t)GMYSpeedPID.output, -(int16_t)GMPSpeedPID.output);
 //    Set_Gimbal_Current(CAN1, -(int16_t)GMYSpeedPID.output, 0);
-//        Set_Gimbal_Current(CAN1, 0, -(int16_t)GMPSpeedPID.output);
+//    Set_Gimbal_Current(CAN1, 0, -(int16_t)GMPSpeedPID.output);
 }
 
 void UpperMonitorControlLoop(void){
@@ -303,15 +305,20 @@ void ShootControlLoop(void){
     else{
         shooting = 1;
     }
+    
     if ( Rammer.torque > 11000 ){
         Set_t_inversion(120);
     }
+    
     if ( Get_t_inversion() > 0 ){
         RammerSpeedPID( ( int16_t ) -1000 );
         Set_Rammer_Current( CAN1, (int16_t)RAMMERSpeedPID.output );
         Set_t_inversion(Get_t_inversion() - 1);
     }
-    else if ( shooting == 0 || RammerHeatControl() == 1 ){
+    
+//    heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
+    
+    if ( shooting == 0){
         RammerSpeedPID( ( int16_t ) 0 );
         Set_Rammer_Current( CAN1, (int16_t)RAMMERSpeedPID.output );
     }
@@ -343,158 +350,99 @@ void ControtTaskInit(void){
     GMYSpeedPID.Reset(&GMYSpeedPID);
 }
 
-void Monitor_Pitch_PID(void)
-{
-    printf("PKP:%3.2f,PKI:%1.2f,PKD:%3.2f,VKP:%3.2f,VKI:%1.2f,VKD:%3.2f\r\n",
-    GMPPositionPID.kp,GMPPositionPID.ki,GMPPositionPID.kd,GMPSpeedPID.kp,GMPSpeedPID.ki,GMPSpeedPID.kd);
-}
-void Monitor_Yaw_PID(void)
-{
-    printf("PKP:%3.2f,PKI:%1.2f,PKD:%3.2f,VKP:%3.2f,VKI:%1.2f,VKD:%3.2f\r\n",
-    GMYPositionPID.kp,GMYPositionPID.ki,GMYPositionPID.kd,GMYSpeedPID.kp,GMYSpeedPID.ki,GMYSpeedPID.kd);
-}
-void Monitor_Rammer_PID(void)
-{
-    printf("VKP:%3.2f,VKI:%1.2f,VKD:%3.2f\r\n",RAMMERSpeedPID.kp,RAMMERSpeedPID.ki,RAMMERSpeedPID.kd);
-}
-void GMP_PID_PLUS(int x,int y)
-{
-    switch(x){
-    case 0x1:
-        GMPPositionPID.kp += (float)y/100;
-        break;
-    case 0x2:
-        GMPPositionPID.ki += (float)y/100;
-        break;
-    case 0x3:
-        GMPPositionPID.kd += (float)y/100;
-        break;
-    case 0x4:
-        GMPSpeedPID.kp += (float)y/100;
-        break;
-    case 0x5:
-        GMPSpeedPID.ki += (float)y/100;
-        break;
-    case 0x6:
-        GMPSpeedPID.kd += (float)y/100;
-        break;
-    default :
-        ;
+
+
+/**
+  * @brief          枪口热量控制
+  * @author         李运环
+   *@param[in]      从裁判系统读取的枪口热量， 从裁判系统读取的实时射速
+  * @retval         返回空
+  */
+#define SENTRY_HEAT_THRESHOLD   480
+
+void heat_control(volatile int16_t const current_heat, volatile float const current_velocity){
+    static int8_t available_bullet_num = 0;
+    static int8_t velocity_threshold = 30;
+    static int8_t launched_bullet_num = 0;
+    static float velocity_last = 0;
+    static float velocity_now = 0;
+    static int8_t shoot_flag = 0;
+    
+    available_bullet_num = (SENTRY_HEAT_THRESHOLD - current_heat) / velocity_threshold - 1;
+
+    velocity_last = velocity_now;
+    velocity_now = current_velocity;          
+
+    if(velocity_now != velocity_last){     //发射数据更新
+        launched_bullet_num++;             //已发射子弹加一
     }
-    Monitor_Pitch_PID();
-}
-void GMP_PID_MIN(int x,int y)
-{
-    switch(x){
-    case 0x1:
-        GMPPositionPID.kp -= (float)y/100;
-        break;
-    case 0x2:
-        GMPPositionPID.ki -= (float)y/100;
-        break;
-    case 0x3:
-        GMPPositionPID.kd -= (float)y/100;
-        break;
-    case 0x4:
-        GMPSpeedPID.kp -= (float)y/100;
-        break;
-    case 0x5:
-        GMPSpeedPID.ki -= (float)y/100;
-        break;
-    case 0x6:
-        GMPSpeedPID.kd -= (float)y/100;
-        break;
-    default :
-        ;
+    if(launched_bullet_num >= available_bullet_num){         //已发射子弹数大于等于可发射子弹数
+        shoot_flag = 0;                //拨盘停止
+        launched_bullet_num = 0;       //子弹清零
     }
-    Monitor_Pitch_PID();
-}
-void GMY_PID_PLUS(int x,int y)
-{
-    switch(x){
-    case 0x1:
-        GMYPositionPID.kp += (float)y/100;
-        break;
-    case 0x2:
-        GMYPositionPID.ki += (float)y/100;
-        break;
-    case 0x3:
-        GMYPositionPID.kd += (float)y/100;
-        break;
-    case 0x4:
-        GMYSpeedPID.kp += (float)y/100;
-        break;
-    case 0x5:
-        GMYSpeedPID.ki += (float)y/100;
-        break;
-    case 0x6:
-        GMYSpeedPID.kd += (float)y/100;
-        break;
-    default :
-        ;
+    else{
+        shoot_flag = 1;
     }
-    Monitor_Yaw_PID();
-}
-void GMY_PID_MIN(int x,int y)
-{
-    switch(x){
-    case 0x1:
-        GMYPositionPID.kp -= (float)y/100;
-        break;
-    case 0x2:
-        GMYPositionPID.ki -= (float)y/100;
-        break;
-    case 0x3:
-        GMYPositionPID.kd -= (float)y/100;
-        break;
-    case 0x4:
-        GMYSpeedPID.kp -= (float)y/100;
-        break;
-    case 0x5:
-        GMYSpeedPID.ki -= (float)y/100;
-        break;
-    case 0x6:
-        GMYSpeedPID.kd -= (float)y/100;
-        break;
-    default :
-        ;
+    
+    if(1 == shoot_flag && 1 == shooting){
+        shooting = 1;
     }
-    Monitor_Yaw_PID();
+    else{
+        shooting = 0;
+    }
+    if(current_heat <= 35){
+        shooting = 0;
+    }
 }
 
-void RAMMER_PID_PLUS(int x,int y)
-{
-    switch(x){
-    case 0x1:
-        RAMMERSpeedPID.kp += (float)y/100;
-        break;
-    case 0x2:
-        RAMMERSpeedPID.ki += (float)y/100;
-        break;
-    case 0x3:
-        RAMMERSpeedPID.kd += (float)y/100;
-        break;
-    default :
-        ;
-    }
-    Monitor_Rammer_PID();
-}
-void RAMMER_PID_MIN(int x,int y)
-{
-    switch(x){
-    case 0x1:
-        RAMMERSpeedPID.kp -= (float)y/100;
-        break;
-    case 0x2:
-        RAMMERSpeedPID.ki -= (float)y/100;
-        break;
-    case 0x3:
-        RAMMERSpeedPID.kd -= (float)y/100;
-        break;
-    default :
-        ;
-    }
-    Monitor_Rammer_PID();
-}
 
+/**
+  * @brief          摩擦轮开关控制，通过读取枚举FrictionWheelState_e变量判断状态，先让一个（停）转，再让另一个（停）转。
+  * @author         李运环
+   *@param[in]      NULL
+  * @retval         返回空
+  */
+void friction_control(void){
+    static int first_start_friction = 1;
+    static int first_stop_friction = 0;
+    static int stop_flag = 0;
+    static int friction_wheel_speed_1 = 1000;
+    static int friction_wheel_speed_2 = 1000;
+    if(GetFrictionState() == FRICTION_WHEEL_ON){                //摩擦轮开
+        if(first_start_friction == 1){
+            FrictionRamp1.ResetCounter(&FrictionRamp1);
+            FrictionRamp2.ResetCounter(&FrictionRamp2);
+            first_start_friction = 0;
+        }
+        friction_wheel_speed_1 = 1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1);
+        if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+            friction_wheel_speed_2 = 1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2);
+            if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
+                first_stop_friction = 1;
+                stop_flag = 1;
+                //此处添加拨盘开
+            }
+        }
+    }
+    else if(GetFrictionState() == FRICTION_WHEEL_OFF){          //摩擦轮关
+        //此处添加拨盘关
+        if(stop_flag == 1){
+            if(first_stop_friction == 1){
+                FrictionRamp1.ResetCounter(&FrictionRamp1);
+                FrictionRamp2.ResetCounter(&FrictionRamp2);
+                first_start_friction = 1;
+                first_stop_friction = 0;
+            }
+            friction_wheel_speed_2 = FRICTION_WHEEL_MAX_DUTY - (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2);
+            if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
+                friction_wheel_speed_1 = FRICTION_WHEEL_MAX_DUTY - (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1);
+                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+                    stop_flag = 0;
+                }
+            }
+        }
+    }
+    SetFrictionWheelSpeed_1(friction_wheel_speed_1);
+    SetFrictionWheelSpeed_2(friction_wheel_speed_2);
+}
 
