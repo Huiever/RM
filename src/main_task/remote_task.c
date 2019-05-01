@@ -5,10 +5,9 @@
 #include "usart6.h"
 #include "control_task.h"
 #include "stdio.h"
-
+#include "beep.h"
 int start_friction_flag = 0;
 int  FRICTION_WHEEL_MAX_DUTY = 1350;
-static package_t package = { 0x0a,0x0d,0x11,0x00,0x00,0x00,0x00,0x0d,0x0a };
 static ControlMode_e controlmode = STOP;
 
 RC_Ctl_t           RC_CtrlData;
@@ -23,10 +22,11 @@ uint8_t Frion_Flag         = 0;
 int16_t MiniPC_Alive_Count = 0;
 
 int16_t ChassisSpeed_Target = 0;
+volatile uint8_t upperMonitorOnline = 0;
 
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
-
+static package_t package = { 0x0a,0x0d,0xff,0x00,0x00,0x00,0x00,0x0d,0x0a };
 void miniPC_ACK_status(void){
     package.cmdid = 0x11;
     package.data[0] = 0xff; 
@@ -34,8 +34,22 @@ void miniPC_ACK_status(void){
     package.data[2] = GET_PITCH_ANGLE;
     USART6_Print((uint8_t*)&package, 9);
 }
+void miniPC_HS_SYN(void) {
+    package.cmdid = 0x09;
+    USART6_Print((uint8_t*)&package, 9);
+}
 
-volatile uint8_t upperMonitorOnline = 0;
+void miniPC_task(void){//仅执行一次，无时延要求，在主函数中参与循环
+    static int lastPCState = 0;
+    if(Get_Flag(PC_ack) == 1 && lastPCState == 0){
+        lastPCState = 1;
+        Sing_miniPC_online();
+    }
+    else if(Get_Flag(PC_ack) == 0 && lastPCState == 0){    //发起握手
+        miniPC_HS_SYN();
+    }
+}
+
 static   UpperMonitor_Ctr_t upperMonitorCmd = {0,GIMBAL_CMD_STOP,0,0};
 int first_start_friction = 1;
 void UpperMonitorDataProcess(uint8_t *pData){
@@ -48,7 +62,8 @@ void UpperMonitorDataProcess(uint8_t *pData){
     static const uint8_t START_SHOOTING          = 0x06;
     static const uint8_t STOP_SHOOTING           = 0x07;
     static const uint8_t REQUEST_CURR_STATE      = 0x08;
-    static const uint8_t EXIT_UPPER_MONITOR_CTR  = 0x09;
+    static const uint8_t ACK                     = 0x10;
+    static const uint8_t EXIT_UPPER_MONITOR_CTR  = 0x12;
     static const uint8_t MINIPC_ALIVE            = 0x0F;
     int16_t d1 = *((int16_t *)(pData + 1));
     int16_t d2 = *((int16_t *)(pData + 3));
@@ -60,7 +75,8 @@ void UpperMonitorDataProcess(uint8_t *pData){
             case SEND_STATUS:{
                 miniPC_ACK_status();
             }break;
-            
+                
+
             case GIMBAL_MOVEBY:{
                 upperMonitorCmd.d1 = d1 * 0.001f;
                 upperMonitorCmd.d2 = d2 * 0.001f;
@@ -72,25 +88,7 @@ void UpperMonitorDataProcess(uint8_t *pData){
             }break;
             
             case START_FRICTION:{
-//                if(first_start_friction == 1){
-//                    FrictionRamp1.ResetCounter(&FrictionRamp1);
-//                    FrictionRamp2.ResetCounter(&FrictionRamp2);
-//                    first_start_friction = 0;
-//                }
-//                SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
-//                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-//                    SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
-//                    if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
-//                        count++;
-//                        if(count <= 5){
-//                            RequestFinishFrictionSpeedUp();
-//                            count = 6;
-//                        }
-//                        else{
-//                            count = 6;
-//                        }
-//                    }
-//                }
+
                 SetFrictionState(FRICTION_WHEEL_ON);
                 upperMonitorCmd.startFriction = 1;
             }break;
@@ -98,9 +96,6 @@ void UpperMonitorDataProcess(uint8_t *pData){
             case STOP_FRICTION:{
                 SetFrictionState(FRICTION_WHEEL_OFF);
                 upperMonitorCmd.startFriction = 0;
-//                InitOrStopFrictionWheel();
-//                FrictionRamp1.ResetCounter(&FrictionRamp1);
-//                FrictionRamp2.ResetCounter(&FrictionRamp2);
             }break;
             
             case START_SHOOTING:{
@@ -129,8 +124,11 @@ void UpperMonitorDataProcess(uint8_t *pData){
         }
     }
     else if(pData[0] == START_UPPER_MONITOR_CTR){
-                SetUpperMonitorOnline(1);
-        }
+        SetUpperMonitorOnline(1);
+    }
+    else if(pData[0] ==  ACK){
+        Set_Flag(PC_ack);
+    }
     else if(pData[0] == MINIPC_ALIVE){
     Reset_MiniPC_Alive_Count();
 }
@@ -205,9 +203,6 @@ void ResetUpperMonitorCmd_d1_d2(void){
     upperMonitorCmd.d2 = 0;
 }
 
-void RequestFinishFrictionSpeedUp(void){
-    UART6_PrintCh('1');
-}
 
 void GimbalAngleLimit(void){
     VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN + 5.0f, PITCH_MAX-5.0f);
@@ -247,23 +242,12 @@ void RemoteDataProcess(uint8_t *pData){
                 if( RC_CtrlData.rc.s1 == 1 ){
                     Set_Flag_AutoShoot(0);
                     SetFrictionState(FRICTION_WHEEL_OFF);
-//                    InitOrStopFrictionWheel();
-//                    FrictionRamp1.ResetCounter(&FrictionRamp1);
-//                    FrictionRamp2.ResetCounter(&FrictionRamp2);
                 }
                 else if( RC_CtrlData.rc.s1 == 3 ){
-//                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
-//                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-//                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
-//                    }
                     SetFrictionState(FRICTION_WHEEL_ON);
                     Set_Flag_AutoShoot(0);
                 }
                 else{
-//                    SetFrictionWheelSpeed_1(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1));
-//                    if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-//                        SetFrictionWheelSpeed_2(1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2));
-//                    }
                     SetFrictionState(FRICTION_WHEEL_ON);
                     Set_Flag_AutoShoot(1);
                 }
@@ -311,7 +295,5 @@ void RemoteTaskInit(void){
   FrictionRamp1.ResetCounter(&FrictionRamp1);
   FrictionRamp2.SetScale(&FrictionRamp2, FRICTION_RAMP_TICK_COUNT);
   FrictionRamp2.ResetCounter(&FrictionRamp2);
-  Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
-  Gimbal_Target.yaw_angle_target   = YAW_INIT_ANGLE;
   SetFrictionState(FRICTION_WHEEL_OFF);
 }

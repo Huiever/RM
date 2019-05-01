@@ -24,7 +24,7 @@
 
 void BSP_Pre_Init(void){
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-    
+
     KEY_Init();
     LED_Init(); 
     BEEP_Init();
@@ -33,7 +33,7 @@ void BSP_Pre_Init(void){
     USART2_Init(115200);
     USART3_Init(115200);
     USART6_Init(115200);
-    
+
     SPI5_Init();
 
     power_init();  //24V电源依次开启
@@ -41,11 +41,16 @@ void BSP_Pre_Init(void){
 
 void BSP_Init(void)
 {
+    CAN1_Init();
+    CAN2_Init();
+    TIM6_Init();
+    Dbus_Init();
+    
     ControtTaskInit();
     RemoteTaskInit();
     Flags_Init();
-
     Gun_Init();
+    
 #if Calibrate_Snail_ESC == 1       //油门校准，零油门--1ms高电平 满油门--2ms高电平
     SetFrictionWheelSpeed(2000);        
     delay_ms(3000);
@@ -61,12 +66,6 @@ void BSP_Init(void)
 //    Laser_Init();
     delay_ms(100);
     imu_init();
-//    Judge_Init();
-
-    TIM6_Init();
-    CAN1_Init();
-    CAN2_Init();
-    Dbus_Init();
 
     TIM6_Start();
 }

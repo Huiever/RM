@@ -5,10 +5,9 @@
 
 #define PITCH_MAX                   0.0f
 #define PITCH_MIN                   -40.0f
-#define PITCH_INIT_ANGLE            -20.0f
-#define YAW_INIT_ANGLE              0.0f
 
-#define FRICTION_RAMP_TICK_COUNT    300                
+
+#define FRICTION_RAMP_TICK_COUNT    200                
 
 #define REMOTE_CONTROLLER_STICK_OFFSET      1024u
 
@@ -150,6 +149,6 @@ void RemoteDataProcess(uint8_t *pData);
 void SetControlMode(Remote *rc);
 void Reset_ChassisSpeed_Target(void);
 
-
+void miniPC_task(void);
 extern RC_Ctl_t           RC_CtrlData;
 #endif

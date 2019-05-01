@@ -59,7 +59,14 @@ void Sing_Startup_music(void){
     delay_ms(200);
     }
 }
-
+void Sing_miniPC_online(void){
+    int index = 5;
+    while (index >= 0) {
+        Sing(Mavic_Startup_music[index--]);
+        delay_ms(200);
+    }
+    Sing(Silent);
+}
 void Sing_bad_case(void){
     while(1){
         Sing(Mi3M);

@@ -676,6 +676,11 @@
               <FileType>1</FileType>
               <FilePath>..\src\main_task\judge_task.c</FilePath>
             </File>
+            <File>
+              <FileName>miniPC.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\main_task\miniPC.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

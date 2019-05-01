@@ -116,7 +116,7 @@ void Flags_Init(void){
     Creat_Flag(Shoot_speed_mode, 0);
     Creat_Flag(start_fix, 0);
     Creat_Flag(target_angle_fix, 0);
-    Creat_Flag(PC_online, 0);
+    Creat_Flag(PC_ack, 0);
     Creat_Flag(Auto_aim, 0);
     Creat_Flag(BS_recg_state_in, 0);
     Creat_Flag(B_has_press_down, 0);

@@ -13,7 +13,7 @@ typedef enum{
     Shoot_speed_mode, // high(1) or low(0) speed : Flag_ShootSpeed
     start_fix,        // : fixed_start
     target_angle_fix, // : target_fixed_angle
-    PC_online,        // : upperMonitorOnline
+    PC_ack,        // : upperMonitorOnline
     Auto_aim,         // : upperMonitorWork
     BS_recg_state_in, // Is(1) in BS_recg_state or not(0) : Is_Big_Symbol_Recognition_On
     B_has_press_down, // key B press down(1) or not(0) : key_B

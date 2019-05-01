@@ -9,7 +9,7 @@
 #include "remote_task.h"
 #include "main.h"
 #include "gun.h"
-
+#include "miniPC.h"
 
 
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
@@ -32,14 +32,11 @@ static uint32_t time_tick_1ms = 0;
 
 void heat_control(volatile int16_t const current_heat, volatile float const current_velocity);
 void friction_control(void);
+void miniPCControlLoop(void);
 
 void Control_Task(void){
     time_tick_1ms++;
     WorkStateFSM();
-//    MiniPC_Alive_Count_PlusPlus();
-//    if(Get_MiniPC_Alive_Count() > 3000 && GetWorkState() == SHOOT_STATE){
-//        ResetUpperMonitorCmd();
-//    }
     if(GetWorkState() == SHOOT_STATE){
         UpperMonitorControlLoop();
     }
@@ -245,14 +242,12 @@ void GMPitchControlLoop(void){
     GMPPositionPID.Calc(&GMPPositionPID);
     
     GMPSpeedPID.ref = GMPPositionPID.output;
-//    GMPSpeedPID.ref = 0;
     GMPSpeedPID.fdb = GET_PITCH_ANGULAR_SPEED;
     GMPSpeedPID.Calc(&GMPSpeedPID);
 }
 
 void GMYawControlLoop(void){
     GMYPositionPID.Calc(&GMYPositionPID);
-    
     GMYSpeedPID.ref = GMYPositionPID.output;
 
 #if DEBUG_YAW_PID == 2
@@ -277,6 +272,41 @@ void SetGimbalMotorOutput(void){
 //    Set_Gimbal_Current(CAN1, -(int16_t)GMYSpeedPID.output, 0);
 //    Set_Gimbal_Current(CAN1, 0, -(int16_t)GMPSpeedPID.output);
 }
+
+//void miniPCControlLoop(void) {
+//    UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
+//    switch (cmd.cmdid) {
+//        case GIMBAL_MOVEBY: {
+//            Gimbal_Target.yaw_angle_target   += cmd.d1 * 0.001;
+//            Gimbal_Target.pitch_angle_target += cmd.d2 * 0.001;
+//        }break;
+
+////        case START_FRICTION:{
+////            SetFrictionState(FRICTION_WHEEL_ON);
+////            upperMonitorCmd.startFriction = 1;
+////        }break;
+////            
+////        case STOP_FRICTION:{
+////            SetFrictionState(FRICTION_WHEEL_OFF);
+////            upperMonitorCmd.startFriction = 0;
+////        }break;
+////        
+////        case START_SHOOTING:{
+////            Set_Flag_AutoShoot(1);
+////        }break;
+////        
+////        case STOP_SHOOTING:{
+////            Set_Flag_AutoShoot(0);
+////        }break;
+////        
+////        case REQUEST_CURR_STATE:{
+////            
+////        }break;
+//        
+//        default: {
+//        }break;
+//    }
+//}
 
 void UpperMonitorControlLoop(void){
     UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
@@ -316,7 +346,8 @@ void ShootControlLoop(void){
         Set_t_inversion(Get_t_inversion() - 1);
     }
     
-//    heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
+
+    heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
     
     if ( shooting == 0){
         RammerSpeedPID( ( int16_t ) 0 );
@@ -341,8 +372,8 @@ void ControtTaskInit(void){
     GMYawRamp.SetScale(&GMYawRamp, PREPARE_TIME_TICK_MS);
     GMPitchRamp.ResetCounter(&GMPitchRamp);
     GMYawRamp.ResetCounter(&GMYawRamp);
-    Gimbal_Target.pitch_angle_target = 0.0f;
-    Gimbal_Target.yaw_angle_target   = 0.0f;
+    Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
+    Gimbal_Target.yaw_angle_target   = YAW_INIT_ANGLE;
     RAMMERSpeedPID.Reset(&RAMMERSpeedPID);
     GMPPositionPID.Reset(&GMPPositionPID);
     GMPSpeedPID.Reset(&GMPSpeedPID);
@@ -390,7 +421,7 @@ void heat_control(volatile int16_t const current_heat, volatile float const curr
     else{
         shooting = 0;
     }
-    if(current_heat <= 35){
+    if(SENTRY_HEAT_THRESHOLD - current_heat <= 35){
         shooting = 0;
     }
 }

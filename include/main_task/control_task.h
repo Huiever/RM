@@ -5,6 +5,9 @@
 #include "pid_regulator.h"
 #include "can_bus_task.h"
 
+#define PITCH_INIT_ANGLE            -20.0f
+#define YAW_INIT_ANGLE              0.0f
+
 #define PREPARE_TIME_TICK_MS      4000
 #define YAW_POSITION_KP_DEFAULTS  10
 #define YAW_POSITION_KI_DEFAULTS  0
@@ -26,8 +29,8 @@
 #define RAMMER_SPEED_KI_DEFAULTS  0
 #define RAMMER_SPEED_KD_DEFAULTS  0 
 
-#define GIMBAL_YAW_CRUISE_DELTA 1.5f
-#define GIMBAL_PITCH_CRUISE_DELTA 1.0f
+#define GIMBAL_YAW_CRUISE_DELTA 4.0f
+#define GIMBAL_PITCH_CRUISE_DELTA 0.5f
 
 //#define GET_YAW_ANGLE()           get_yaw_angle()
 //#define GET_YAW_ANGLE()           imu_yaw_angle
