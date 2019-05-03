@@ -41,6 +41,7 @@ void GMP_PID_PLUS(int x,int y)
     default :
         ;
     }
+    
     Monitor_Pitch_PID();
 }
 void GMP_PID_MIN(int x,int y)

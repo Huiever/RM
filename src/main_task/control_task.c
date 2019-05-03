@@ -32,7 +32,6 @@ static uint32_t time_tick_1ms = 0;
 
 void heat_control(volatile int16_t const current_heat, volatile float const current_velocity);
 void friction_control(void);
-void miniPCControlLoop(void);
 
 void Control_Task(void){
     time_tick_1ms++;
@@ -238,7 +237,7 @@ void GMPitchControlLoop(void){
     GimbalAngleLimit();
     
     GMPPositionPID.ref = Gimbal_Target.pitch_angle_target;
-    GMPPositionPID.fdb = GMPitchEncoder.ecd_angle * GMPitchRamp.Calc(&GMPitchRamp);
+    GMPPositionPID.fdb = GMPitchEncoder.ecd_angle;
     GMPPositionPID.Calc(&GMPPositionPID);
     
     GMPSpeedPID.ref = GMPPositionPID.output;
