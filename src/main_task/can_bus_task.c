@@ -14,7 +14,7 @@ volatile uint8_t  Flag_In_RunAwayState = 0;
 
 void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
     int i = 0;
-    int32_t temp_sum  = 0;
+    int32_t temp_sum  = 0;    
     v->last_raw_value = v->raw_value;
     v->raw_value = (msg->Data[0]<<8)|msg->Data[1];
     v->diff = v->raw_value - v->last_raw_value;
@@ -43,29 +43,26 @@ void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
 
 void CanReceiveMsgProcess(CanRxMsg * msg){
     volatile static uint32_t bullet_speed[1] = {0};
+    
     switch(msg->StdId){
         case CAN_BUS1_Yaw_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMYawEncoder, msg);
         }break;
-
         case CAN_BUS1_Pitch_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMPitchEncoder, msg);
         }break;
-
         case CAN_BUS1_Rammer_FEEDBACK_MSG_ID:{
             Rammer.angle  = msg->Data[0] << 8 | msg->Data[1];
             Rammer.speed  = msg->Data[2] << 8 | msg->Data[3];
             Rammer.torque = msg->Data[4] << 8 | msg->Data[5];
         }break;
-
         case ChassisSensor_ID:{
             Sentry_HeatData = msg->Data[0]<<8 | msg->Data[1];
             Sentry_BulletSpeed = msg->Data[2]<<8 | msg->Data[3];
             Flag_In_RunAwayState = msg->Data[4];
-        }break;
-
+        }
         default:{
-           
+            
         }break;
     }
 

@@ -11,7 +11,7 @@
 #include "can_bus_task.h"
 #include "control_task.h"
 #include "visualscope.h"
-#include "miniPC.h"
+
 int main(void){
     BSP_Pre_Init();
     usmart_dev.init(SystemCoreClock/1000000);//使用的是timer4
@@ -22,6 +22,7 @@ int main(void){
     }
     BSP_Init();
 
+    
     while(1){
 //        printf("yaw_raw_value:%6.6d  pit_raw_value:%6.6d  yaw_ecd:%6.6f  pit_ecd:%6.6f\r\n",
 //        GMYawEncoder.raw_value, GMPitchEncoder.raw_value,GMYawEncoder.ecd_angle, GMPitchEncoder.ecd_angle);

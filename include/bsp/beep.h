@@ -42,9 +42,9 @@ void BEEP_Configuration(void);
 void Sing(Sound_tone_e tone);
 void Sing_Startup_music(void);
 void BEEP_Init(void);
-void Sing_miniPC_online(void);
-void Sing_bad_case(void);
 
+void Sing_bad_case(void);
+void Sing_miniPC_online(void);
 #endif
 
 
