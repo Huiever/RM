@@ -2,7 +2,6 @@
 #include "sys.h"
 #include "control_task.h"
 #include "remote_task.h"
-#include "judge_task.h"
 #include "gun.h"
 #include "laser.h"
 #include "usart6.h"
@@ -42,7 +41,6 @@ void BSP_Pre_Init(void){
 void BSP_Init(void)
 {
     ControtTaskInit();
-    RemoteTaskInit();
     Flags_Init();
 
     Gun_Init();
@@ -61,7 +59,6 @@ void BSP_Init(void)
 //    Laser_Init();
     delay_ms(100);
     imu_init();
-//    Judge_Init();
 
     TIM6_Init();
     CAN1_Init();

@@ -184,6 +184,7 @@
             <hadXRAM>0</hadXRAM>
             <uocXRam>0</uocXRam>
             <RvdsVP>2</RvdsVP>
+            <RvdsMve>0</RvdsMve>
             <hadIRAM2>1</hadIRAM2>
             <hadIROM2>0</hadIROM2>
             <StupSel>8</StupSel>
@@ -381,11 +382,6 @@
         <Group>
           <GroupName>USER</GroupName>
           <Files>
-            <File>
-              <FileName>readme.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\readme.txt</FilePath>
-            </File>
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
@@ -672,9 +668,9 @@
               <FilePath>..\src\main_task\remote_task.c</FilePath>
             </File>
             <File>
-              <FileName>judge_task.c</FileName>
+              <FileName>minipc_task.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\main_task\judge_task.c</FilePath>
+              <FilePath>..\src\main_task\minipc_task.c</FilePath>
             </File>
           </Files>
         </Group>

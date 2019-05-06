@@ -3,9 +3,6 @@
 #include "sys.h"
 #include "arm_math.h"
 
-
-
-
 void kalman_filter_init(kalman_filter_t *F, kalman_filter_init_t *I)
 {
   mat_init(&F->xhat,2,1,(float *)I->xhat_data);

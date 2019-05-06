@@ -5,8 +5,12 @@
 #include "pid_regulator.h"
 #include "can_bus_task.h"
 
-#define PITCH_INIT_ANGLE            -20.0f
 #define YAW_INIT_ANGLE              0.0f
+#define PITCH_INIT_ANGLE            -20.0f
+#define PITCH_MAX                   4.0f
+#define PITCH_MIN                   -40.0f
+#define FRICTION_RAMP_TICK_COUNT    200
+
 
 #define PREPARE_TIME_TICK_MS      4000
 #define YAW_POSITION_KP_DEFAULTS  10
@@ -47,6 +51,11 @@ typedef enum{
     STOP_STATE,
     CONTROL_STATE,
 }WorkState_e;
+
+typedef enum{
+    FRICTION_WHEEL_OFF = 0,
+    FRICTION_WHEEL_ON = 1,
+}FrictionWheelState_e;
 
 #define GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT \
 {\
@@ -162,7 +171,19 @@ typedef enum{
     &PID_Calc,\
     &PID_Reset,\
 }
-
+#define VAL_LIMIT(val, min, max)\
+if(val<=min)\
+{\
+    val = min;\
+}\
+else if(val>=max)\
+{\
+    val = max;\
+}\
+else\
+{\
+    val = val;\
+}
 
 extern PID_Regulator_t GMPPositionPID ;
 extern PID_Regulator_t GMPSpeedPID    ;
@@ -172,22 +193,10 @@ extern PID_Regulator_t RAMMERSpeedPID ;
 
 void Control_Task(void);
 void ControtTaskInit(void);
-void WorkStateFSM(void);
-void SetWorkState(WorkState_e state);
+FrictionWheelState_e GetFrictionState(void);
 WorkState_e GetWorkState(void);
-
-void SetGimbalMotorOutput(void);
-void GMYawControlLoop(void);
-void GMPitchControlLoop(void);
-void GimbalYawControlModeSwitch(void);
-
-void UpperMonitorControlLoop(void);
-void ShootControlLoop(void);
-void RammerControlLoop(void);
+void SetFrictionState(FrictionWheelState_e v);
 void RammerSpeedPID( int16_t TargetSpeed);
-void BigSymbolRecgShootControl(void);
-uint8_t RammerHeatControl(void);
+void Set_FRICTION_WHEEL_MAX_DUTY(uint32_t x);
 
-extern int8_t available_bullet_num ;
-extern int8_t launched_bullet_num ;
 #endif

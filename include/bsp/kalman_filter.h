@@ -31,7 +31,6 @@ typedef struct
   float R_data[4];
 } kalman_filter_init_t;
 
-
 extern void kalman_filter_init(kalman_filter_t *F, kalman_filter_init_t *I);
 extern float *kalman_filter_calc(kalman_filter_t *F, float signal1, float signal2);
 

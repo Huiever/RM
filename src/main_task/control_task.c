@@ -9,6 +9,7 @@
 #include "remote_task.h"
 #include "main.h"
 #include "gun.h"
+#include "minipc_task.h"
 
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
 PID_Regulator_t GMPSpeedPID    = GIMBAL_MOTOR_PITCH_SPEED_PID_DEFAULT;
@@ -19,39 +20,27 @@ PID_Regulator_t RAMMERSpeedPID = RAMMER_SPEED_PID_DEFAULT;
 WorkState_e lastWorkState = PREPARE_STATE;
 WorkState_e workState     = PREPARE_STATE;
 
-int8_t   shooting    = 0;
-uint16_t HeatLimit   = 360;
-uint8_t  ShootSpeed  = 25;
-
 RampGen_t GMPitchRamp = RAMP_GEN_DAFAULT;
 RampGen_t GMYawRamp   = RAMP_GEN_DAFAULT;
+RampGen_t FrictionRamp1 = RAMP_GEN_DAFAULT;
+RampGen_t FrictionRamp2 = RAMP_GEN_DAFAULT;
+FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
 static uint32_t time_tick_1ms = 0;
-
 void heat_control(volatile int16_t const current_heat, volatile float const current_velocity);
-void friction_control(void);
 
-void Control_Task(void){
-    time_tick_1ms++;
-    WorkStateFSM();
-    if(GetWorkState() == SHOOT_STATE){
-        UpperMonitorControlLoop();
-    }
-    GimbalYawControlModeSwitch();
-    GMPitchControlLoop();
-    GMYawControlLoop();
-#if Monitor_GM_Encoder == 0 || DISABLE_GIMBLA_OUTPUT == 1
-    SetGimbalMotorOutput();
-#endif
-    if(time_tick_1ms % 2 == 0){
-        friction_control();
-        ShootControlLoop();
-    }
-    else{
-        Send_Gimbal_Info(GetUpperMonitorOnline(),Is_Control_State(),Get_ChassisSpeed_Target());
-    }
+void GimbalAngleLimit(void){
+    VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN + 5.0f, PITCH_MAX-5.0f);
 }
 
+/*****************************************状态机*****************************************/
+/**
+  * @author         李运环
+  * @brief          云台状态切换
+  * @latest         2019.5.4
+  * @param[in]      NULL
+  * @retval         返回空
+  */
 void WorkStateFSM(void){
     lastWorkState = workState;
     switch(workState){
@@ -77,7 +66,7 @@ void WorkStateFSM(void){
             if(Get_Flag_In_RunAwayState() == 1){
                 workState = RUNAWAY_STATE;
             }
-            //Send_Gimbal_Info(1,0,0);
+            Send_Gimbal_Info(1,0,0);
         }break;
         case RUNAWAY_STATE:{
             if(Get_Flag_In_RunAwayState() == 0){
@@ -92,7 +81,7 @@ void WorkStateFSM(void){
                 workState = CRUISE_STATE;
                 Reset_ChassisSpeed_Target();
             }
-            if(GetUpperMonitorOnline() == 1){
+            if(GetUpperMonitorOnline() == 1){                                                                                 
                 workState = SHOOT_STATE;
                 Reset_ChassisSpeed_Target();
             }
@@ -108,24 +97,27 @@ void SetWorkState(WorkState_e state){
 WorkState_e GetWorkState(void){
     return workState;
 }
-
-void GimbalYawControlModeSwitch(void){
+/*****************************************YAW PITCH电机*****************************************/
+/**
+  * @author         李运环
+  * @brief          yaw电机状态切换
+  * @latest         2019.5.4
+  * @param[in]      NULL
+  * @retval         返回空
+  */
+void GMYawModeSwitch(void){
     static uint8_t  CruiseFlag    = 0;
     static uint8_t  ShootFlag     = 0;
     static uint8_t  RunAwayFlag   = 0;
     static uint8_t  ControlFlag   = 0;
-    static float    YawAngleSave  = 0.0f;
     static int16_t  Cruise_Time_Between = 0;
     static uint8_t  pitch_dowm_flag = 0;
     switch(GetWorkState()){
         case PREPARE_STATE:{
-            GMYPositionPID.ref = 177.0f;
-            GMYPositionPID.fdb = 177.0f;
-            YawAngleSave = GET_YAW_ANGLE();
+            Gimbal_Target.yaw_angle_target = GET_YAW_ANGLE();
         }break;
         case CRUISE_STATE:{
             if(CruiseFlag == 0){
-                Gimbal_Target.yaw_angle_target = YawAngleSave;
                 CruiseFlag  = 1;
                 ShootFlag   = 0;
                 RunAwayFlag = 0;
@@ -150,7 +142,6 @@ void GimbalYawControlModeSwitch(void){
                 if(Gimbal_Target.pitch_angle_target < PITCH_MIN+5){
                     pitch_dowm_flag = 0;
                 }
-
                 Cruise_Time_Between=0;
             }
 
@@ -167,27 +158,19 @@ void GimbalYawControlModeSwitch(void){
             }
             i++;
 #endif
-            GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
-            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
         case SHOOT_STATE:{
             if(ShootFlag == 0){
-                Gimbal_Target.yaw_angle_target = YawAngleSave; 
                 ShootFlag   = 1;
                 CruiseFlag  = 0;
                 RunAwayFlag = 0;
             }
-            GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
-            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
         case RUNAWAY_STATE:{
             if(RunAwayFlag == 0){
-                Gimbal_Target.yaw_angle_target = YawAngleSave;
                 RunAwayFlag=1;
                 CruiseFlag=0;
             }
-            GMYPositionPID.ref = YawAngleSave;
-            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
         case STOP_STATE:{
             
@@ -205,18 +188,53 @@ void GimbalYawControlModeSwitch(void){
             i++;
 #endif
             if(ControlFlag == 0){
-                Gimbal_Target.yaw_angle_target = YawAngleSave;
                 ControlFlag = 1;
                 CruiseFlag  = 0;
                 ShootFlag   = 0;
             }
-            GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
-            GMYPositionPID.fdb = GET_YAW_ANGLE();
         }break;
     }
-    YawAngleSave = GET_YAW_ANGLE();
+
 }
 
+/**
+  * @author         李运环
+  * @brief          yaw电机控制
+  * @data           2019.5.4
+  * @param[in]      NULL
+  * @retval         返回空
+  */
+void GMYawControlLoop(void){
+    GMYPositionPID.ref = Gimbal_Target.yaw_angle_target;
+    GMYPositionPID.fdb = GET_YAW_ANGLE();
+    GMYPositionPID.Calc(&GMYPositionPID);
+    
+    GMYSpeedPID.ref = GMYPositionPID.output;
+
+#if DEBUG_YAW_PID == 2
+//    static int i=0;
+//    if(i==4000){
+//        GMYSpeedPID.ref = 100;
+//    }
+//    else if(i>=8000){
+//        GMYSpeedPID.ref = -100;
+//        i=0;
+//    }
+//    i++;
+    GMYSpeedPID.ref = 0;
+#endif
+
+    GMYSpeedPID.fdb = GET_YAW_ANGULAR_SPEED;
+    GMYSpeedPID.Calc(&GMYSpeedPID);
+}
+
+/**
+  * @author         李运环
+  * @brief          pitch电机控制
+  * @latest         2019.5.4
+  * @param[in]      NULL
+  * @retval         返回空
+  */
 void GMPitchControlLoop(void){
 
 #if DEBUG_PICTH_PID == 1
@@ -243,34 +261,20 @@ void GMPitchControlLoop(void){
     GMPSpeedPID.Calc(&GMPSpeedPID);
 }
 
-void GMYawControlLoop(void){
-    GMYPositionPID.Calc(&GMYPositionPID);
-    
-    GMYSpeedPID.ref = GMYPositionPID.output;
-
-#if DEBUG_YAW_PID == 2
-//    static int i=0;
-//    if(i==4000){
-//        GMYSpeedPID.ref = 100;
-//    }
-//    else if(i>=8000){
-//        GMYSpeedPID.ref = -100;
-//        i=0;
-//    }
-//    i++;
-    GMYSpeedPID.ref = 0;
-#endif
-
-    GMYSpeedPID.fdb = GET_YAW_ANGULAR_SPEED;
-    GMYSpeedPID.Calc(&GMYSpeedPID);
-}
-
 void SetGimbalMotorOutput(void){
     Set_Gimbal_Current(CAN1, -(int16_t)GMYSpeedPID.output, -(int16_t)GMPSpeedPID.output);
 //    Set_Gimbal_Current(CAN1, -(int16_t)GMYSpeedPID.output, 0);
 //    Set_Gimbal_Current(CAN1, 0, -(int16_t)GMPSpeedPID.output);
 }
 
+
+/**
+  * @brief          minipc控制回路
+  * @author         李运环
+  * @data           2019.5.4
+  * @param[in]      NULL
+  * @retval         返回空
+  */
 void UpperMonitorControlLoop(void){
     UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
     switch(cmd.gimbalMovingCtrType){
@@ -284,21 +288,24 @@ void UpperMonitorControlLoop(void){
     }
 }
 
-uint8_t RammerHeatControl(void){
-    if ( Get_Sentry_HeatData() > HeatLimit - 2*ShootSpeed )
-        return 1;
-    else
-        return 0;
+/*****************************************拨弹电机*****************************************/
+
+static int16_t t_inversion    = 0;
+void Set_t_inversion(int16_t t){
+    t_inversion = t;
 }
 
+int16_t Get_t_inversion(void){
+    return t_inversion;
+}
+
+/**
+  * @brief          拨弹电机控制
+  * @author         李运环
+   *@param[in]      NULL
+  * @retval         返回空
+  */
 void ShootControlLoop(void){
-    if ( Get_Flag_AutoShoot() == 0 ){
-        shooting = 0;
-    }
-    else{
-        shooting = 1;
-    }
-    
     if ( Rammer.torque > 11000 ){
         Set_t_inversion(120);
     }
@@ -311,7 +318,7 @@ void ShootControlLoop(void){
     
     heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
     
-    if ( shooting == 0){
+    if ( Get_Flag(Shoot) == 0){
         RammerSpeedPID( ( int16_t ) 0 );
         Set_Rammer_Current( CAN1, (int16_t)RAMMERSpeedPID.output );
     }
@@ -327,26 +334,11 @@ void RammerSpeedPID( int16_t TargetSpeed){
     RAMMERSpeedPID.Calc(&RAMMERSpeedPID);
 }
 
-void ControtTaskInit(void){
-    time_tick_1ms = 0;
-    SetWorkState(PREPARE_STATE); 
-    GMPitchRamp.SetScale(&GMPitchRamp, PREPARE_TIME_TICK_MS);
-    GMYawRamp.SetScale(&GMYawRamp, PREPARE_TIME_TICK_MS);
-    GMPitchRamp.ResetCounter(&GMPitchRamp);
-    GMYawRamp.ResetCounter(&GMYawRamp);
-    Gimbal_Target.pitch_angle_target = 0.0f;
-    Gimbal_Target.yaw_angle_target   = 0.0f;
-    RAMMERSpeedPID.Reset(&RAMMERSpeedPID);
-    GMPPositionPID.Reset(&GMPPositionPID);
-    GMPSpeedPID.Reset(&GMPSpeedPID);
-    GMYPositionPID.Reset(&GMYPositionPID);
-    GMYSpeedPID.Reset(&GMYSpeedPID);
-}
-
 /**
-  * @brief          枪口热量控制
   * @author         李运环
-   *@param[in]      从裁判系统读取的枪口热量， 从裁判系统读取的实时射速
+  * @brief          枪口热量控制
+  * @date           2019.4.17
+  * @param[in]      从裁判系统读取的枪口热量， 从裁判系统读取的实时射速
   * @retval         返回空
   */
 #define SENTRY_HEAT_THRESHOLD   480
@@ -375,24 +367,39 @@ void heat_control(volatile int16_t const current_heat, volatile float const curr
         shoot_flag = 1;
     }
     
-    if(1 == shoot_flag && 1 == shooting){
-        shooting = 1;
+    if(1 == shoot_flag && 1 == Get_Flag(Shoot)){
+        Set_Flag(Shoot);
     }
     else{
-        shooting = 0;
+        Reset_Flag(Shoot);
     }
+    
     if((SENTRY_HEAT_THRESHOLD - current_heat) <= 35){
-        shooting = 0;
+        Reset_Flag(Shoot);
     }
 }
-
-
+/*****************************************摩擦轮电机*****************************************/
 /**
-  * @brief          摩擦轮开关控制，通过读取枚举FrictionWheelState_e变量判断状态，先让一个（停）转，再让另一个（停）转。
+  * @brief          摩擦轮初始化
   * @author         李运环
    *@param[in]      NULL
   * @retval         返回空
   */
+void friction_init(void){
+    FrictionRamp1.SetScale(&FrictionRamp1, FRICTION_RAMP_TICK_COUNT);
+    FrictionRamp1.ResetCounter(&FrictionRamp1);
+    FrictionRamp2.SetScale(&FrictionRamp2, FRICTION_RAMP_TICK_COUNT);
+    FrictionRamp2.ResetCounter(&FrictionRamp2);
+    SetFrictionState(FRICTION_WHEEL_ON);
+}
+
+/**
+  * @brief          摩擦轮开关控制，通过读取枚举FrictionWheelState_e变量判断状态，先让一个（停）转，再让另一个（停）转。
+  * @author         李运环
+  * @param[in]      NULL
+  * @retval         返回空
+  */
+static int  FRICTION_WHEEL_MAX_DUTY = 1300;
 void friction_control(void){
     static int first_start_friction = 1;
     static int first_stop_friction = 0;
@@ -437,3 +444,54 @@ void friction_control(void){
     SetFrictionWheelSpeed_2(friction_wheel_speed_2);
 }
 
+void Set_FRICTION_WHEEL_MAX_DUTY( uint32_t x ){
+    FRICTION_WHEEL_MAX_DUTY = x;
+}
+
+FrictionWheelState_e GetFrictionState(){
+    return friction_wheel_state;
+}
+
+void SetFrictionState(FrictionWheelState_e v){
+    friction_wheel_state = v;
+}
+
+/*****************************************控制任务*****************************************/
+
+void ControtTaskInit(void){
+    time_tick_1ms = 0;
+    SetWorkState(PREPARE_STATE); 
+    GMPitchRamp.SetScale(&GMPitchRamp, PREPARE_TIME_TICK_MS);
+    GMYawRamp.SetScale(&GMYawRamp, PREPARE_TIME_TICK_MS);
+    GMPitchRamp.ResetCounter(&GMPitchRamp);
+    GMYawRamp.ResetCounter(&GMYawRamp);
+    Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
+    Gimbal_Target.yaw_angle_target   = YAW_INIT_ANGLE;
+    RAMMERSpeedPID.Reset(&RAMMERSpeedPID);
+    GMPPositionPID.Reset(&GMPPositionPID);
+    GMPSpeedPID.Reset(&GMPSpeedPID);
+    GMYPositionPID.Reset(&GMYPositionPID);
+    GMYSpeedPID.Reset(&GMYSpeedPID);
+    friction_init();
+}
+
+void Control_Task(void){
+    time_tick_1ms++;
+    WorkStateFSM();
+    if(GetWorkState() == SHOOT_STATE){
+        UpperMonitorControlLoop();
+    }
+    GMPitchControlLoop();
+    GMYawModeSwitch();
+    GMYawControlLoop();
+#if Monitor_GM_Encoder == 0 || DISABLE_GIMBLA_OUTPUT == 1
+    SetGimbalMotorOutput();
+#endif
+    if(time_tick_1ms % 2 == 0){
+        friction_control();
+        ShootControlLoop();
+    }
+    else{
+        Send_Gimbal_Info(GetUpperMonitorOnline(),Is_Control_State(),Get_ChassisSpeed_Target());
+    }
+}
