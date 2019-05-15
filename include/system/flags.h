@@ -14,9 +14,9 @@ typedef enum{
     start_fix,        // : fixed_start
     target_angle_fix, // : target_fixed_angle
     PC_ack,        // : upperMonitorOnline
-    Auto_aim,         // : upperMonitorWork
-    BS_recg_state_in, // Is(1) in BS_recg_state or not(0) : Is_Big_Symbol_Recognition_On
-    B_has_press_down, // key B press down(1) or not(0) : key_B
+    Auto_aim_debug,         // : upperMonitorWork
+    Gimble_ok, // Is(1) in BS_recg_state or not(0) : Is_Big_Symbol_Recognition_On
+    Camera_error, // key B press down(1) or not(0) : key_B
     Z_has_press_down, // key Z press down(1) or not(0) : key_Z
     V_has_press_down, // key V press down(1) or not(0) : key_V
     normal_stat,      // first control cycle getting in NORMAL_STATE from other state(0) or not(1) : NormalFlag

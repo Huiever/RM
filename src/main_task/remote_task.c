@@ -7,11 +7,7 @@
 #include "stdio.h"
 #include "beep.h"
 
-/*
-25    5000    1
-17    5000    1/5
-20    5000    1
-*/
+
 
 static ControlMode_e controlmode = STOP;
 RC_Ctl_t           RC_CtrlData;
@@ -42,6 +38,14 @@ void RemoteDataProcess(uint8_t *pData){
             RC_CtrlData.mouse.press_l = pData[12];
             RC_CtrlData.mouse.press_r = pData[13];
             RC_CtrlData.key.v   = ((int16_t)pData[14]) | ((int16_t)pData[15] << 8);
+            
+            if( RC_CtrlData.rc.s1 == 1 ){
+                Set_Flag(Auto_aim_debug);
+            }
+            else{
+                Reset_Flag(Auto_aim_debug);
+            }
+            
             SetControlMode(&RC_CtrlData.rc);
             if(GetWorkState() == CONTROL_STATE){
                 ChassisSpeed_Target = (RC_CtrlData.rc.ch1 - 1024) * 20;

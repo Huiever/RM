@@ -60,7 +60,7 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
             Sentry_HeatData = msg->Data[0]<<8 | msg->Data[1];
             Sentry_BulletSpeed = msg->Data[2]<<8 | msg->Data[3];
             Flag_In_RunAwayState = msg->Data[4];
-        }
+        }break;
         default:{
             
         }break;

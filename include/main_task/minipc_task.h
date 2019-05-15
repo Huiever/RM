@@ -6,7 +6,7 @@ typedef struct {
     uint8_t start1;
     uint8_t start2;
     uint8_t cmdid;
-    uint8_t data[4];
+    int8_t  data[4]; //int8_t
     uint8_t end1;
     uint8_t end2;
 }package_t;

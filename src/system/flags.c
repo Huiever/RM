@@ -117,9 +117,9 @@ void Flags_Init(void){
     Creat_Flag(start_fix, 0);
     Creat_Flag(target_angle_fix, 0);
     Creat_Flag(PC_ack, 0);
-    Creat_Flag(Auto_aim, 0);
-    Creat_Flag(BS_recg_state_in, 0);
-    Creat_Flag(B_has_press_down, 0);
+    Creat_Flag(Auto_aim_debug, 0);
+    Creat_Flag(Gimble_ok, 0);
+    Creat_Flag(Camera_error, 0);
     Creat_Flag(Z_has_press_down, 0);
     Creat_Flag(V_has_press_down, 0);
     Creat_Flag(normal_stat, 0);

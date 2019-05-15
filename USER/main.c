@@ -34,7 +34,11 @@ int main(void){
 //        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, imu.atti.yaw, imu_yaw_angle);
 //        printf("fdb:%f,ref:%f\r\n",GMPPositionPID.fdb,GMPPositionPID.ref);
         imu_main();
-        miniPC_task();
+        
+        if(Get_Flag(Gimble_ok) == 1){
+            miniPC_task();
+        }
+
         delay_ms(2);
     }
 }

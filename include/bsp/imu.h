@@ -12,13 +12,13 @@
 #define IMU_TEMPERATURE_CONTROL     1                       //imu温控，可能导致漂移，需测试后使用
 #define IMU_CONTROL_TEMPERATURE     40                      //imu控制温度
 
-#define ACC_X_OFFSET    -1530   //
-#define ACC_Y_OFFSET    115
-#define ACC_Z_OFFSET    1343
+#define ACC_X_OFFSET    -33   //
+#define ACC_Y_OFFSET    77
+#define ACC_Z_OFFSET    -43
 
-#define GYRO_X_OFFSET    15     //
-#define GYRO_Y_OFFSET    87
-#define GYRO_Z_OFFSET    30
+#define GYRO_X_OFFSET    23     //
+#define GYRO_Y_OFFSET    77
+#define GYRO_Z_OFFSET    26
 
 #define MAG_SEN         0.1f    //转换成 uT
 #define MAG_X_OFFSET    -10     //磁场偏移，采样空间磁场后matlab计算得到
@@ -123,10 +123,10 @@ typedef struct{
     imu_rawdata_t raw;
     imu_offset_t  offset;
 }imu_t;
-
+extern float imu_temp;
 extern void imu_init(void);              //imu初始化
 extern void imu_main(void);              //imu获取姿态角主函数
-
+void IMU_temp_Control(double temp);
 extern float imu_yaw_angle;              //yaw角度 °
 extern float imu_yaw_angular_speed;      //yaw角速度 °/s
 extern float imu_pitch_angular_speed;    //pitch角速度 °/s

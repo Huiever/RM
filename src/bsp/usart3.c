@@ -93,7 +93,3 @@ void USART3_SendChar(unsigned char b){
         ;
   USART_SendData(USART3,b);
 }
-
-
-
-

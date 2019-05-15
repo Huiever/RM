@@ -36,9 +36,9 @@
 #define GIMBAL_YAW_CRUISE_DELTA   4.0f
 #define GIMBAL_PITCH_CRUISE_DELTA 0.5f
 
-//#define GET_YAW_ANGLE()           get_yaw_angle()
-//#define GET_YAW_ANGLE()           imu_yaw_angle
-#define GET_YAW_ANGLE()           GMYawEncoder.ecd_angle
+//#define GET_YAW_ANGLE           get_yaw_angle()
+//#define GET_YAW_ANGLE           imu_yaw_angle
+#define GET_YAW_ANGLE             GMYawEncoder.ecd_angle
 #define GET_YAW_ANGULAR_SPEED     imu_yaw_angular_speed
 #define GET_PITCH_ANGLE           GMPitchEncoder.ecd_angle
 #define GET_PITCH_ANGULAR_SPEED   -imu_pitch_angular_speed

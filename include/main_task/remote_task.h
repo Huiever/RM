@@ -9,8 +9,6 @@
 #define STICK_TO_PITCH_ANGLE_INC_FACT       0.004f
 #define STICK_TO_YAW_ANGLE_INC_FACT         0.020f
 
-
-
 typedef __packed struct{
     int16_t ch0;
     int16_t ch1;
