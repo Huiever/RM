@@ -7,8 +7,8 @@
 
 #define YAW_INIT_ANGLE              0.0f
 #define PITCH_INIT_ANGLE            -20.0f
-#define PITCH_MAX                   4.0f
-#define PITCH_MIN                   -40.0f
+#define PITCH_MAX                   -10.0f
+#define PITCH_MIN                   -35.0f
 #define FRICTION_RAMP_TICK_COUNT    200
 
 
@@ -33,7 +33,7 @@
 #define RAMMER_SPEED_KI_DEFAULTS  0
 #define RAMMER_SPEED_KD_DEFAULTS  0 
 
-#define GIMBAL_YAW_CRUISE_DELTA   4.0f
+#define GIMBAL_YAW_CRUISE_DELTA   3.0f
 #define GIMBAL_PITCH_CRUISE_DELTA 0.5f
 
 //#define GET_YAW_ANGLE           get_yaw_angle()
@@ -190,6 +190,8 @@ extern PID_Regulator_t GMPSpeedPID    ;
 extern PID_Regulator_t GMYPositionPID ;
 extern PID_Regulator_t GMYSpeedPID    ;
 extern PID_Regulator_t RAMMERSpeedPID ;
+
+extern volatile int16_t minipc_alive_count;
 
 void Control_Task(void);
 void ControtTaskInit(void);

@@ -68,12 +68,16 @@ void Sing_miniPC_online(void){
     Sing(Silent);
 }
 void Sing_bad_case(void){
-    while(1){
-        Sing(Mi3M);
-        delay_ms(1000);
-        Sing(Silent);
-        delay_ms(1000);
+    static int first_error = 1;
+    if(first_error == 1){
+        for(int i = 0; i < 3; i++){
+            Sing(Mi3M);
+            delay_ms(1000);
+            Sing(Silent);
+            delay_ms(1000);
+        }
     }
+    first_error = 0;
 }
 
 void BEEP_Init(void){

@@ -39,11 +39,11 @@ void RemoteDataProcess(uint8_t *pData){
             RC_CtrlData.mouse.press_r = pData[13];
             RC_CtrlData.key.v   = ((int16_t)pData[14]) | ((int16_t)pData[15] << 8);
             
-            if( RC_CtrlData.rc.s1 == 1 ){
-                Set_Flag(Auto_aim_debug);
+            if( RC_CtrlData.rc.s1 == 3 || RC_CtrlData.rc.s1 == 2){
+                Reset_Flag(Auto_aim_debug);
             }
             else{
-                Reset_Flag(Auto_aim_debug);
+                Set_Flag(Auto_aim_debug);
             }
             
             SetControlMode(&RC_CtrlData.rc);

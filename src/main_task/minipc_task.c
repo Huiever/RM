@@ -62,6 +62,7 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
 
     if(pData[0] ==  SEND_STATUS){
         miniPC_ACK_status();
+        minipc_alive_count = 0;
     }
     
     if(upperMonitorOnline){

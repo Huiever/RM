@@ -29,6 +29,8 @@ FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 volatile static int16_t  t_inversion             = 0;
 volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
 
+volatile int16_t minipc_alive_count = 0;
+
 /*
 25    5000    1
 17    5000    1/5
@@ -39,7 +41,7 @@ volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
 1350   <26
 */
 void GimbalAngleLimit(void){
-    VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN + 5.0f, PITCH_MAX-5.0f);
+    VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN, PITCH_MAX);
 }
 
 /**
@@ -323,17 +325,17 @@ void RammerSpeedPID( int16_t TargetSpeed){
   * @brief          枪口热量控制
   * @date           2019.4.17
   * @param[in]      从裁判系统读取的枪口热量， 从裁判系统读取的实时射速
-  * @retval         返回空
+  * @retval         拨盘停止返回1，否则返回0
   */
 #define SENTRY_HEAT_THRESHOLD   480
 
-void heat_control(volatile int16_t const current_heat, volatile float const current_velocity){
+int8_t heat_control(volatile int16_t const current_heat, volatile float const current_velocity){
     static int8_t available_bullet_num = 0;
     static int8_t velocity_threshold = 30;
     static int8_t launched_bullet_num = 0;
     static float velocity_last = 0;
     static float velocity_now = 0;
-    static int8_t shoot_flag = 0;
+    static int8_t heat_control_flag = 0;
     
     available_bullet_num = (SENTRY_HEAT_THRESHOLD - current_heat) / velocity_threshold - 1;
 
@@ -344,23 +346,18 @@ void heat_control(volatile int16_t const current_heat, volatile float const curr
         launched_bullet_num++;             //已发射子弹加一
     }
     if(launched_bullet_num >= available_bullet_num){         //已发射子弹数大于等于可发射子弹数
-        shoot_flag = 0;                //拨盘停止
-        launched_bullet_num = 0;       //子弹清零
+        heat_control_flag = 1;             //拨盘停止
+        launched_bullet_num = 0;           //子弹清零
     }
     else{
-        shoot_flag = 1;
-    }
-    
-    if(1 == shoot_flag && 1 == Get_Flag(Shoot)){
-        Set_Flag(Shoot);
-    }
-    else{
-        Reset_Flag(Shoot);
+        heat_control_flag = 0;
     }
     
     if((SENTRY_HEAT_THRESHOLD - current_heat) <= 35){
-        Reset_Flag(Shoot);
+        heat_control_flag = 1;
     }
+    
+    return heat_control_flag;
 }
 
 /**
@@ -371,7 +368,8 @@ void heat_control(volatile int16_t const current_heat, volatile float const curr
   */
 void ShootControlLoop(void){
     volatile static int16_t rammer_speed = 0;
-
+    volatile static int8_t  heat_control_flag = 0;
+    
     if ( Rammer.torque > 11000 ){
         Set_t_inversion(120);
     }
@@ -380,9 +378,9 @@ void ShootControlLoop(void){
         Set_t_inversion(Get_t_inversion() - 1);
     }
     
-    heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
+    heat_control_flag = heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
     
-    if ( Get_Flag(Shoot) == 0){
+    if (Get_Flag(Shoot) == 0 || Get_Flag(Auto_aim_debug) == 1 || heat_control_flag == 1 || GET_PITCH_ANGLE >= PITCH_MAX){
         rammer_speed = 0;
     }
     else if(Get_Flag_In_RunAwayState() == 0){
@@ -392,9 +390,6 @@ void ShootControlLoop(void){
         rammer_speed = 2000;   //边跑边打降低射击频率
     }
     
-    if(Get_Flag(Auto_aim_debug) == 1){
-        rammer_speed = 0;
-    }
     RammerSpeedPID(rammer_speed);
     Set_Rammer_Current(CAN1, (int16_t)RAMMERSpeedPID.output);
 }
@@ -506,6 +501,9 @@ void ControtTaskInit(void){
   */
 void Control_Task(void){
     volatile static uint8_t time_tick = 0;
+    if(minipc_alive_count++ == 1000){
+        SetUpperMonitorOnline(0);
+    }
     WorkStateFSM();
     if(GetWorkState() == SHOOT_STATE){
         UpperMonitorControlLoop();
