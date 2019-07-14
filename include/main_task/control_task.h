@@ -47,8 +47,6 @@ typedef enum{
     PREPARE_STATE,
     CRUISE_STATE,
     SHOOT_STATE,
-    RUNAWAY_STATE,
-    STOP_STATE,
     CONTROL_STATE,
 }WorkState_e;
 

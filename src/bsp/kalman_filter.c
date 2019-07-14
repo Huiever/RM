@@ -5,9 +5,19 @@
 
 void kalman_filter_init(kalman_filter_t *F, kalman_filter_init_t *I)
 {
-  mat_init(&F->xhat,2,1,(float *)I->xhat_data);
-  mat_init(&F->HT,2,2,(float *)I->HT_data);
-  mat_trans(&F->H, &F->HT);
+    mat_init(&F->z,2,1,(float *)I->z_data);
+    mat_init(&F->xhat,2,1,(float *)I->xhat_data);
+    mat_init(&F->xhatminus,2,1,(float *)I->xhatminus_data);
+    mat_init(&F->K,2,2,(float *)I->K_data);
+    mat_init(&F->P,2,2,(float *)I->P_data);
+    mat_init(&F->A,2,2,(float *)I->A_data);
+    mat_init(&F->H,2,2,(float *)I->H_data);
+    mat_init(&F->Q,2,2,(float *)I->Q_data);
+    mat_init(&F->R,2,2,(float *)I->R_data);
+    mat_init(&F->AT,2,2,(float *)I->AT_data);
+    mat_init(&F->Pminus,2,2,(float *)I->Pminus_data);
+
+    mat_trans(&F->H, &F->HT);
 }
 
 float *kalman_filter_calc(kalman_filter_t *F, float signal1, float signal2)

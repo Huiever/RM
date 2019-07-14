@@ -59,7 +59,6 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
         case ChassisSensor_ID:{
             Sentry_HeatData = msg->Data[0]<<8 | msg->Data[1];
             Sentry_BulletSpeed = msg->Data[2]<<8 | msg->Data[3];
-            Flag_In_RunAwayState = msg->Data[4];
         }break;
         default:{
             
@@ -133,8 +132,4 @@ float Get_Sentry_BulletSpeed(void){
 
 uint16_t Get_Sentry_HeatData(void){
     return Sentry_HeatData;
-}
-
-uint8_t  Get_Flag_In_RunAwayState(void){
-    return Flag_In_RunAwayState;
 }

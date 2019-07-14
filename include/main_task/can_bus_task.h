@@ -38,7 +38,6 @@ extern volatile Encoder GMPitchEncoder;
 
 uint16_t Get_Sentry_HeatData(void);
 float Get_Sentry_BulletSpeed(void);
-uint8_t  Get_Flag_In_RunAwayState(void);
 void CanReceiveMsgProcess(CanRxMsg *msg);
 void EncoderProcess(volatile Encoder *v, CanRxMsg *msg);
 void Send_Gimbal_Info(uint8_t Flag_Shoot_State, uint8_t Control_Mode, int16_t ChassisSpeed);

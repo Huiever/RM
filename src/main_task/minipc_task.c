@@ -48,10 +48,6 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
     static const uint8_t SEND_STATUS             = 0x01;
     static const uint8_t GIMBAL_MOVEBY           = 0x02;
     static const uint8_t GIMBAL_MOVETO           = 0x03;
-    static const uint8_t START_FRICTION          = 0x04;
-    static const uint8_t STOP_FRICTION           = 0x05;
-    static const uint8_t START_SHOOTING          = 0x06;
-    static const uint8_t STOP_SHOOTING           = 0x07;
     static const uint8_t REQUEST_CURR_STATE      = 0x08;
     static const uint8_t ACK                     = 0x10;
     static const uint8_t EXIT_UPPER_MONITOR_CTR  = 0x12;
@@ -64,7 +60,11 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
         miniPC_ACK_status();
         minipc_alive_count = 0;
     }
-    
+    if(pData[0] ==  CAMERA_ERROR){ //…„œÒÕ∑¥ÌŒÛ‘Ú∑‰√˘∆˜œÏ«“œ¬œﬂminipc
+        Set_Flag(Camera_error);
+        SetUpperMonitorOnline(0);
+        Reset_Flag(Shoot);
+    }
     if(upperMonitorOnline){
         switch (pData[0]){
             case GIMBAL_MOVEBY:{
@@ -77,24 +77,6 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
                 upperMonitorCmd.d1 = d1;
                 upperMonitorCmd.d2 = d2;
                 upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVETO;
-            }break;
-            
-            case START_FRICTION:{
-                SetFrictionState(FRICTION_WHEEL_ON);
-                upperMonitorCmd.startFriction = 1;
-            }break;
-                
-            case STOP_FRICTION:{
-                SetFrictionState(FRICTION_WHEEL_OFF);
-                upperMonitorCmd.startFriction = 0;
-            }break;
-            
-            case START_SHOOTING:{
-                Set_Flag(Shoot);
-            }break;
-            
-            case STOP_SHOOTING:{
-                Reset_Flag(Shoot);
             }break;
             
             case REQUEST_CURR_STATE:{
@@ -118,9 +100,6 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
     }
     else if(pData[0] ==  ACK){
         Set_Flag(PC_ack);
-    }
-    else if(pData[0] ==  CAMERA_ERROR){
-        Set_Flag(Camera_error);
     }
     else{
         ;

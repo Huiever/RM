@@ -26,20 +26,10 @@ WorkState_e lastWorkState = PREPARE_STATE;
 WorkState_e workState     = PREPARE_STATE;
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
-volatile static int16_t  t_inversion             = 0;
-volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
 
+volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
 volatile int16_t minipc_alive_count = 0;
 
-/*
-25    5000    1
-17    5000    1/5
-20    5000    1
-*/
-/*
-1300   <22
-1350   <26
-*/
 void GimbalAngleLimit(void){
     VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN, PITCH_MAX);
 }
@@ -66,9 +56,6 @@ void WorkStateFSM(void){
             if(GetUpperMonitorOnline() == 1){
                 workState = SHOOT_STATE;
             }
-//            if(Get_Flag_In_RunAwayState() == 1){
-//                workState = RUNAWAY_STATE;
-//            }
             if(GetControlMode() == REMOTE_CONTROL){
                 workState = CONTROL_STATE;
             }
@@ -77,18 +64,6 @@ void WorkStateFSM(void){
             if(GetUpperMonitorOnline() == 0){
                 workState = CRUISE_STATE;
             }
-            if(Get_Flag_In_RunAwayState() == 0){
-                Send_Gimbal_Info(1,0,0);
-            }
-            
-        }break;
-        case RUNAWAY_STATE:{
-//            if(Get_Flag_In_RunAwayState() == 0){
-//                workState = CRUISE_STATE;
-//            }
-        }break;
-        case STOP_STATE:{
-            
         }break;
         case CONTROL_STATE:{
             if(GetControlMode() != REMOTE_CONTROL){
@@ -111,7 +86,29 @@ void SetWorkState(WorkState_e state){
 WorkState_e GetWorkState(void){
     return workState;
 }
-
+/**
+  * @brief          minipc控制回路
+  * @author         李运环
+  * @data           2019.5.4
+  * @param[in]      NULL
+  * @retval         返回空
+  */
+void UpperMonitorControlLoop(void){
+    UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
+    switch(cmd.gimbalMovingCtrType){
+        case GIMBAL_CMD_MOVEBY:{
+            Gimbal_Target.yaw_angle_target   += cmd.d1;
+            Gimbal_Target.pitch_angle_target += cmd.d2;
+        }break;
+        case GIMBAL_CMD_MOVETO:{
+            Gimbal_Target.yaw_angle_target    = cmd.d1;
+            Gimbal_Target.pitch_angle_target  = cmd.d2;
+        }break;
+        default:{
+            
+        }break;
+    }
+}
 /**
   * @author         李运环
   * @brief          云台电机各状态任务
@@ -120,25 +117,15 @@ WorkState_e GetWorkState(void){
   * @retval         返回空
   */
 void GMYawPitchModeSwitch(void){
-    static uint8_t  CruiseFlag    = 0;
-    static uint8_t  ShootFlag     = 0;
-    static uint8_t  RunAwayFlag   = 0;
-    static uint8_t  ControlFlag   = 0;
     static int16_t  Cruise_Time_Between = 0;
     static uint8_t  pitch_dowm_flag = 0;
+    
     switch(GetWorkState()){
         case PREPARE_STATE:{
             Gimbal_Target.yaw_angle_target   = GET_YAW_ANGLE;
             Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
         }break;
         case CRUISE_STATE:{
-            if(CruiseFlag == 0){
-                CruiseFlag  = 1;
-                ShootFlag   = 0;
-                RunAwayFlag = 0;
-                ControlFlag = 0;
-            }
-
 #if DEBUG_YAW_PID == 0
             Cruise_Time_Between++;
             if(Cruise_Time_Between > 10){
@@ -159,7 +146,6 @@ void GMYawPitchModeSwitch(void){
                 }
                 Cruise_Time_Between=0;
             }
-
 #endif
 
 #if DEBUG_YAW_PID == 1
@@ -175,20 +161,7 @@ void GMYawPitchModeSwitch(void){
 #endif
         }break;
         case SHOOT_STATE:{
-            if(ShootFlag == 0){
-                ShootFlag   = 1;
-                CruiseFlag  = 0;
-                RunAwayFlag = 0;
-            }
-        }break;
-        case RUNAWAY_STATE:{
-            if(RunAwayFlag == 0){
-                RunAwayFlag=1;
-                CruiseFlag=0;
-            }
-        }break;
-        case STOP_STATE:{
-            
+            UpperMonitorControlLoop();
         }break;
         case CONTROL_STATE:{
 #if DEBUG_YAW_PID == 1
@@ -202,11 +175,6 @@ void GMYawPitchModeSwitch(void){
             }
             i++;
 #endif
-            if(ControlFlag == 0){
-                ControlFlag = 1;
-                CruiseFlag  = 0;
-                ShootFlag   = 0;
-            }
         }break;
     }
 
@@ -282,38 +250,6 @@ void SetGimbalMotorOutput(void){
 //    Set_Gimbal_Current(CAN1, 0, -(int16_t)GMPSpeedPID.output);
 }
 
-/**
-  * @brief          minipc控制回路
-  * @author         李运环
-  * @data           2019.5.4
-  * @param[in]      NULL
-  * @retval         返回空
-  */
-void UpperMonitorControlLoop(void){
-    UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
-    switch(cmd.gimbalMovingCtrType){
-        case GIMBAL_CMD_MOVEBY:{
-            Gimbal_Target.yaw_angle_target   += cmd.d1;
-            Gimbal_Target.pitch_angle_target += cmd.d2;
-        }break;
-        case GIMBAL_CMD_MOVETO:{
-            Gimbal_Target.yaw_angle_target    = cmd.d1;
-            Gimbal_Target.pitch_angle_target  = cmd.d2;
-        }break;
-        default:{
-            
-        }break;
-    }
-}
-
-void Set_t_inversion(int16_t t){
-    t_inversion = t;
-}
-
-int16_t Get_t_inversion(void){
-    return t_inversion;
-}
-
 void RammerSpeedPID( int16_t TargetSpeed){
     RAMMERSpeedPID.ref = TargetSpeed;
     RAMMERSpeedPID.fdb = Rammer.speed;
@@ -323,38 +259,49 @@ void RammerSpeedPID( int16_t TargetSpeed){
 /**
   * @author         李运环
   * @brief          枪口热量控制
-  * @date           2019.4.17
+  * @date           2019.7.9
   * @param[in]      从裁判系统读取的枪口热量， 从裁判系统读取的实时射速
   * @retval         拨盘停止返回1，否则返回0
   */
 #define SENTRY_HEAT_THRESHOLD   480
+#define VELOCITY_THRESHOLD      30
 
 int8_t heat_control(volatile int16_t const current_heat, volatile float const current_velocity){
-    static int8_t available_bullet_num = 0;
-    static int8_t velocity_threshold = 30;
-    static int8_t launched_bullet_num = 0;
-    static float velocity_last = 0;
-    static float velocity_now = 0;
+//    static int8_t available_bullet_num = 0;
+//    static int8_t launched_bullet_num = 0;
+//    static float velocity_last = 0;
+//    static float velocity_now = 0;
+//    static int16_t heat_last = 0;
+//    static int16_t heat_now = 480;
     static int8_t heat_control_flag = 0;
     
-    available_bullet_num = (SENTRY_HEAT_THRESHOLD - current_heat) / velocity_threshold - 1;
+//    available_bullet_num = (SENTRY_HEAT_THRESHOLD - current_heat) / VELOCITY_THRESHOLD - 1;
 
-    velocity_last = velocity_now;
-    velocity_now = current_velocity;          
-
-    if(velocity_now != velocity_last){     //发射数据更新
-        launched_bullet_num++;             //已发射子弹加一
-    }
-    if(launched_bullet_num >= available_bullet_num){         //已发射子弹数大于等于可发射子弹数
-        heat_control_flag = 1;             //拨盘停止
-        launched_bullet_num = 0;           //子弹清零
+//    velocity_last = velocity_now;
+//    velocity_now = current_velocity;
+//    
+//    heat_last = heat_now;
+//    heat_now = current_heat;
+//    if(heat_last != heat_now){
+//        launched_bullet_num = 0;           //热量更新，则已发射子弹清零
+//    }
+//    
+//    if(velocity_now != velocity_last){     //发射数据更新
+//        launched_bullet_num++;             //已发射子弹加一
+//    }
+//    if(launched_bullet_num >= available_bullet_num){         //已发射子弹数大于等于可发射子弹数
+//        heat_control_flag = 1;             //拨盘停止
+//        launched_bullet_num = 0;           //子弹清零
+//    }
+//    else{
+//        heat_control_flag = 0;
+//    }
+//当热量数据更新频率较高时，可直接用下面的公式限制，简单有效
+    if((SENTRY_HEAT_THRESHOLD - current_heat) <= 35){
+        heat_control_flag = 1;
     }
     else{
         heat_control_flag = 0;
-    }
-    
-    if((SENTRY_HEAT_THRESHOLD - current_heat) <= 35){
-        heat_control_flag = 1;
     }
     
     return heat_control_flag;
@@ -366,16 +313,21 @@ int8_t heat_control(volatile int16_t const current_heat, volatile float const cu
    *@param[in]      NULL
   * @retval         返回空
   */
+#define RAMMER_TORQUE_THRESHOLD  11000  //堵转扭矩
+#define RAMMER_INVERSE_TIME_MS   1000   //反转时间
+#define RAMMER_INVERSE_SPEED     -1000  //反转速度
+#define RAMMER_NORMAL_SPEED      3000   //拨盘转速  转/min
 void ShootControlLoop(void){
-    volatile static int16_t rammer_speed = 0;
     volatile static int8_t  heat_control_flag = 0;
+    volatile static int16_t rammer_speed      = 0;
+    volatile static int16_t t_inversion       = 0;
     
-    if ( Rammer.torque > 11000 ){
-        Set_t_inversion(120);
+    if ( Rammer.torque > RAMMER_TORQUE_THRESHOLD ){
+        t_inversion = RAMMER_INVERSE_TIME_MS/2;
     }
-    if ( Get_t_inversion() > 0 ){
-        rammer_speed = -1000;
-        Set_t_inversion(Get_t_inversion() - 1);
+    if ( t_inversion > 0 ){
+        rammer_speed = RAMMER_INVERSE_SPEED;
+        t_inversion--;
     }
     
     heat_control_flag = heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
@@ -383,11 +335,8 @@ void ShootControlLoop(void){
     if (Get_Flag(Shoot) == 0 || Get_Flag(Auto_aim_debug) == 1 || heat_control_flag == 1 || GET_PITCH_ANGLE >= PITCH_MAX){
         rammer_speed = 0;
     }
-    else if(Get_Flag_In_RunAwayState() == 0){
-        rammer_speed = 3000;
-    }
     else{
-        rammer_speed = 2000;   //边跑边打降低射击频率
+        rammer_speed = RAMMER_NORMAL_SPEED;
     }
     
     RammerSpeedPID(rammer_speed);
@@ -409,12 +358,11 @@ void friction_init(void){
 }
 
 /**
-  * @brief          摩擦轮开关控制，通过读取枚举FrictionWheelState_e变量判断状态，先让一个（停）转，再让另一个（停）转。
+  * @brief          摩擦轮开关控制，通过读取枚举FrictionWheelState_e变量判断状态，先让一个转，再让另一个转。
   * @author         李运环
   * @param[in]      NULL
   * @retval         返回空
   */
-
 void friction_control(void){
     static int first_start_friction = 1;
     static int first_stop_friction = 0;
@@ -436,24 +384,29 @@ void friction_control(void){
                 //此处添加拨盘开
             }
         }
+//        friction_wheel_speed_1 = FRICTION_WHEEL_MAX_DUTY;
+//        friction_wheel_speed_2 = FRICTION_WHEEL_MAX_DUTY;
     }
     else if(GetFrictionState() == FRICTION_WHEEL_OFF){          //摩擦轮关
         //此处添加拨盘关
-        if(stop_flag == 1){
-            if(first_stop_friction == 1){
-                FrictionRamp1.ResetCounter(&FrictionRamp1);
-                FrictionRamp2.ResetCounter(&FrictionRamp2);
-                first_start_friction = 1;
-                first_stop_friction = 0;
-            }
-            friction_wheel_speed_2 = FRICTION_WHEEL_MAX_DUTY - (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2);
-            if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
-                friction_wheel_speed_1 = FRICTION_WHEEL_MAX_DUTY - (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1);
-                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
-                    stop_flag = 0;
-                }
-            }
-        }
+//        if(stop_flag == 1){
+//            if(first_stop_friction == 1){
+//                FrictionRamp1.ResetCounter(&FrictionRamp1);
+//                FrictionRamp2.ResetCounter(&FrictionRamp2);
+//                first_start_friction = 1;
+//                first_stop_friction = 0;
+//            }
+//            friction_wheel_speed_2 = FRICTION_WHEEL_MAX_DUTY - (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2);
+//            if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
+//                friction_wheel_speed_1 = FRICTION_WHEEL_MAX_DUTY - (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1);
+//                if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
+//                    stop_flag = 0;
+//                }
+//            }
+//        }
+        friction_wheel_speed_1 = 1000;
+        friction_wheel_speed_2 = 1000;
+        first_start_friction = 1;
     }
     SetFrictionWheelSpeed_1(friction_wheel_speed_1);
     SetFrictionWheelSpeed_2(friction_wheel_speed_2);
@@ -505,9 +458,6 @@ void Control_Task(void){
         SetUpperMonitorOnline(0);
     }
     WorkStateFSM();
-    if(GetWorkState() == SHOOT_STATE){
-        UpperMonitorControlLoop();
-    }
     GMYawPitchModeSwitch();
     GMYawControlLoop();
     GMPitchControlLoop();
