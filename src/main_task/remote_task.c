@@ -9,7 +9,7 @@
 
 
 
-static ControlMode_e controlmode = STOP;
+static ControlMode_e controlmode = DEBUG_SHOOT;
 RC_Ctl_t           RC_CtrlData;
 Gimbal_Ref_t       GimbalRef;
 Gimbal_Target_t    Gimbal_Target;
@@ -80,7 +80,7 @@ void SetControlMode(Remote *rc){
         controlmode = AUTO_CONTROL;
     }
     else if(rc->s2 == 2){
-        controlmode = STOP;
+        controlmode = DEBUG_SHOOT;
     }
 }
 
@@ -91,6 +91,10 @@ ControlMode_e GetControlMode(void){
 uint8_t Is_Control_State(void){
     if(GetControlMode() == REMOTE_CONTROL){
         return 1;
+    }
+    else if(GetControlMode() == DEBUG_SHOOT){
+        
+        return 0;
     }
     else{
         return 0;

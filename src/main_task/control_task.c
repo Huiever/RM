@@ -29,9 +29,20 @@ FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
 volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
 volatile int16_t minipc_alive_count = 0;
-
+volatile static float first_pit_angle = 0;
+volatile static uint8_t pit_angle_limit_flag = 0;
 void GimbalAngleLimit(void){
-    VAL_LIMIT(Gimbal_Target.pitch_angle_target, PITCH_MIN, PITCH_MAX);
+    if(Gimbal_Target.pitch_angle_target <= PITCH_MIN){
+        Gimbal_Target.pitch_angle_target = PITCH_MIN;
+        pit_angle_limit_flag = 1;
+    }
+    else if(Gimbal_Target.pitch_angle_target >= PITCH_MAX){
+        Gimbal_Target.pitch_angle_target = PITCH_MAX;
+        pit_angle_limit_flag = 1;
+    }
+    else{
+        pit_angle_limit_flag = 0;
+    }
 }
 
 /**
@@ -48,8 +59,6 @@ void WorkStateFSM(void){
         case PREPARE_STATE:{
             if((++time_tick_1ms) > PREPARE_TIME_TICK_MS){
                 workState = CRUISE_STATE;
-                Set_Flag(Gimble_ok);
-                SetFrictionState(FRICTION_WHEEL_ON);
             }
         }break;
         case CRUISE_STATE:{
@@ -70,11 +79,10 @@ void WorkStateFSM(void){
                 workState = CRUISE_STATE;
                 Reset_ChassisSpeed_Target();
             }
-            if(GetUpperMonitorOnline() == 1){                                                                                 
+            if(GetUpperMonitorOnline() == 1){
                 workState = SHOOT_STATE;
                 Reset_ChassisSpeed_Target();
             }
-            Send_Gimbal_Info(0,1,Get_ChassisSpeed_Target());
         }break;
     }
 }
@@ -119,13 +127,23 @@ void UpperMonitorControlLoop(void){
 void GMYawPitchModeSwitch(void){
     static int16_t  Cruise_Time_Between = 0;
     static uint8_t  pitch_dowm_flag = 0;
-    
+    static uint8_t  first_prepare_flag = 1;
+    static uint8_t  first_cruise_flag = 1;
     switch(GetWorkState()){
         case PREPARE_STATE:{
-            Gimbal_Target.yaw_angle_target   = GET_YAW_ANGLE;
-            Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
+            Gimbal_Target.yaw_angle_target = GET_YAW_ANGLE;
+            if(first_prepare_flag == 1 && GMPitchEncoder.ecd_angle != 0){
+                Gimbal_Target.pitch_angle_target = PITCH_INIT_ANGLE;
+                first_pit_angle =  GMPitchEncoder.ecd_angle;
+                first_prepare_flag = 0;
+            };
         }break;
         case CRUISE_STATE:{
+            if(first_cruise_flag == 1){
+                Set_Flag(Gimble_ok);
+                SetFrictionState(FRICTION_WHEEL_ON);
+                first_cruise_flag = 0;
+            };
 #if DEBUG_YAW_PID == 0
             Cruise_Time_Between++;
             if(Cruise_Time_Between > 10){
@@ -162,6 +180,7 @@ void GMYawPitchModeSwitch(void){
         }break;
         case SHOOT_STATE:{
             UpperMonitorControlLoop();
+            Send_Gimbal_Info(1, 0, 0);
         }break;
         case CONTROL_STATE:{
 #if DEBUG_YAW_PID == 1
@@ -175,6 +194,7 @@ void GMYawPitchModeSwitch(void){
             }
             i++;
 #endif
+            Send_Gimbal_Info(0,1,Get_ChassisSpeed_Target());
         }break;
     }
 
@@ -234,7 +254,7 @@ void GMPitchControlLoop(void){
 #endif
     GimbalAngleLimit();
     
-    GMPPositionPID.ref = Gimbal_Target.pitch_angle_target;
+    GMPPositionPID.ref = first_pit_angle + (Gimbal_Target.pitch_angle_target - first_pit_angle) * GMPitchRamp.Calc(&GMPitchRamp);
     GMPPositionPID.fdb = GMPitchEncoder.ecd_angle;
     GMPPositionPID.Calc(&GMPPositionPID);
     
@@ -332,7 +352,7 @@ void ShootControlLoop(void){
     
     heat_control_flag = heat_control(Get_Sentry_HeatData(), Get_Sentry_BulletSpeed());
     
-    if (Get_Flag(Shoot) == 0 || Get_Flag(Auto_aim_debug) == 1 || heat_control_flag == 1 || GET_PITCH_ANGLE >= PITCH_MAX){
+    if (Get_Flag(Shoot) == 0 || Get_Flag(Auto_aim_debug) == 1 || heat_control_flag == 1 || pit_angle_limit_flag == 1){
         rammer_speed = 0;
     }
     else{
@@ -378,11 +398,11 @@ void friction_control(void){
         friction_wheel_speed_1 = 1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp1.Calc(&FrictionRamp1);
         if(FrictionRamp1.IsOverflow(&FrictionRamp1)){
             friction_wheel_speed_2 = 1000 + (FRICTION_WHEEL_MAX_DUTY-1000)*FrictionRamp2.Calc(&FrictionRamp2);
-            if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
-                first_stop_friction = 1;
-                stop_flag = 1;
-                //此处添加拨盘开
-            }
+//            if(FrictionRamp2.IsOverflow(&FrictionRamp2)){
+//                first_stop_friction = 1;
+//                stop_flag = 1;
+//                //此处添加拨盘开
+//            }
         }
 //        friction_wheel_speed_1 = FRICTION_WHEEL_MAX_DUTY;
 //        friction_wheel_speed_2 = FRICTION_WHEEL_MAX_DUTY;

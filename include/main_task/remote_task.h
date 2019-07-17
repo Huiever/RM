@@ -41,7 +41,7 @@ typedef __packed struct{
 typedef enum{
     REMOTE_CONTROL = 1,
     AUTO_CONTROL = 3,
-    STOP = 2,
+    DEBUG_SHOOT = 2,
 }ControlMode_e;
 
 typedef struct{

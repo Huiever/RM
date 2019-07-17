@@ -123,10 +123,10 @@ typedef struct{
     imu_rawdata_t raw;
     imu_offset_t  offset;
 }imu_t;
-extern float imu_temp;
+
 extern void imu_init(void);              //imu初始化
 extern void imu_main(void);              //imu获取姿态角主函数
-void IMU_temp_Control(double temp);
+
 extern float imu_yaw_angle;              //yaw角度 °
 extern float imu_yaw_angular_speed;      //yaw角速度 °/s
 extern float imu_pitch_angular_speed;    //pitch角速度 °/s

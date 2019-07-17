@@ -60,10 +60,9 @@ void BSP_Init(void)
     delay_ms(100);
     imu_init();
 
-    TIM6_Init();
     CAN1_Init();
     CAN2_Init();
     Dbus_Init();
-
+    TIM6_Init();
     TIM6_Start();
 }
