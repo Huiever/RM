@@ -26,11 +26,11 @@ WorkState_e lastWorkState = PREPARE_STATE;
 WorkState_e workState     = PREPARE_STATE;
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
-
 volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
 volatile int16_t minipc_alive_count = 0;
 volatile static float first_pit_angle = 0;
 volatile static uint8_t pit_angle_limit_flag = 0;
+
 void GimbalAngleLimit(void){
     if(Gimbal_Target.pitch_angle_target <= PITCH_MIN){
         Gimbal_Target.pitch_angle_target = PITCH_MIN;
@@ -55,6 +55,7 @@ void GimbalAngleLimit(void){
 void WorkStateFSM(void){
     volatile static uint16_t time_tick_1ms = 0;
     lastWorkState = workState;
+
     switch(workState){
         case PREPARE_STATE:{
             if((++time_tick_1ms) > PREPARE_TIME_TICK_MS){
@@ -85,6 +86,10 @@ void WorkStateFSM(void){
             }
         }break;
     }
+    /* 右拨杆拨到‘下’模拟minipc上线，用于底盘调试 */
+    if(time_tick_1ms >= PREPARE_TIME_TICK_MS && GetControlMode() == FAKE_SHOOT){
+        workState = SHOOT_STATE;
+    }
 }
 
 void SetWorkState(WorkState_e state){
@@ -93,6 +98,22 @@ void SetWorkState(WorkState_e state){
 
 WorkState_e GetWorkState(void){
     return workState;
+}
+uint8_t Is_Shoot_State(void){
+    if(GetWorkState() == SHOOT_STATE){
+        return 1;
+    }
+    else{
+        return 0;
+    }
+}
+uint8_t Is_Control_State(void){
+    if(GetWorkState() == CONTROL_STATE){
+        return 1;
+    }
+    else{
+        return 0;
+    }
 }
 /**
   * @brief          minipc控制回路
@@ -180,7 +201,6 @@ void GMYawPitchModeSwitch(void){
         }break;
         case SHOOT_STATE:{
             UpperMonitorControlLoop();
-            Send_Gimbal_Info(1, 0, 0);
         }break;
         case CONTROL_STATE:{
 #if DEBUG_YAW_PID == 1
@@ -194,7 +214,6 @@ void GMYawPitchModeSwitch(void){
             }
             i++;
 #endif
-            Send_Gimbal_Info(0,1,Get_ChassisSpeed_Target());
         }break;
     }
 
@@ -490,6 +509,6 @@ void Control_Task(void){
         time_tick = 0;
     }
     else{
-        Send_Gimbal_Info(GetUpperMonitorOnline(),Is_Control_State(),Get_ChassisSpeed_Target());
+        Send_Gimbal_Info(Is_Shoot_State(),Is_Control_State(),Get_ChassisSpeed_Target());
     }
 }

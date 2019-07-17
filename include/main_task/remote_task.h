@@ -41,7 +41,7 @@ typedef __packed struct{
 typedef enum{
     REMOTE_CONTROL = 1,
     AUTO_CONTROL = 3,
-    DEBUG_SHOOT = 2,
+    FAKE_SHOOT = 2,
 }ControlMode_e;
 
 typedef struct{
@@ -70,7 +70,6 @@ extern Gimbal_Target_t Gimbal_Target;
 extern RC_Ctl_t        RC_CtrlData;
 
 ControlMode_e GetControlMode(void);
-uint8_t Is_Control_State(void);
 int16_t Get_ChassisSpeed_Target(void);
 void RemoteDataProcess(uint8_t *pData);
 void SetControlMode(Remote *rc);

@@ -16,7 +16,6 @@
 int main(void){
     BSP_Pre_Init();
     usmart_dev.init(SystemCoreClock/1000000);//使用的是timer4
-    delay_ms(1000);
     if(Check_Sum > 1){
         printf("Check your Monitors!\r\n");
         Sing_bad_case();

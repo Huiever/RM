@@ -34,7 +34,6 @@ void BSP_Pre_Init(void){
     USART6_Init(115200);
     
     SPI5_Init();
-
     power_init();  //24V电源依次开启
 }
 
@@ -59,7 +58,6 @@ void BSP_Init(void)
 //    Laser_Init();
     delay_ms(100);
     imu_init();
-
     CAN1_Init();
     CAN2_Init();
     Dbus_Init();
