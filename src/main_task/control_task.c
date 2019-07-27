@@ -10,6 +10,8 @@
 #include "main.h"
 #include "gun.h"
 #include "minipc_task.h"
+#include "kalman_filter.h"
+#include "auto_aim.h"
 
 PID_Regulator_t GMPPositionPID = GIMBAL_MOTOR_PITCH_POSITION_PID_DEFAULT;
 PID_Regulator_t GMPSpeedPID    = GIMBAL_MOTOR_PITCH_SPEED_PID_DEFAULT;
@@ -27,9 +29,10 @@ WorkState_e workState     = PREPARE_STATE;
 FrictionWheelState_e friction_wheel_state = FRICTION_WHEEL_OFF;
 
 volatile static int16_t  FRICTION_WHEEL_MAX_DUTY = 1320;
-volatile int16_t minipc_alive_count = 0;
 volatile static float first_pit_angle = 0;
 volatile static uint8_t pit_angle_limit_flag = 0;
+volatile int16_t minipc_alive_count = 0;
+int16_t AimTic = 0; //for auto aim forcasting 
 
 void GimbalAngleLimit(void){
     if(Gimbal_Target.pitch_angle_target <= PITCH_MIN){
@@ -58,7 +61,7 @@ void WorkStateFSM(void){
 
     switch(workState){
         case PREPARE_STATE:{
-            if((++time_tick_1ms) > PREPARE_TIME_TICK_MS){
+            if((++time_tick_1ms) >= PREPARE_TIME_TICK_MS){
                 workState = CRUISE_STATE;
             }
         }break;
@@ -123,15 +126,39 @@ uint8_t Is_Control_State(void){
   * @retval         返回空
   */
 void UpperMonitorControlLoop(void){
+    static float *angle_data;
+    static float w_x, w_y;
+    static GMAngle_t angle;
+    static float last_yaw = 0;
     UpperMonitor_Ctr_t cmd = GetUpperMonitorCmd();
+    
     switch(cmd.gimbalMovingCtrType){
         case GIMBAL_CMD_MOVEBY:{
             Gimbal_Target.yaw_angle_target   += cmd.d1;
             Gimbal_Target.pitch_angle_target += cmd.d2;
         }break;
         case GIMBAL_CMD_MOVETO:{
+#if   AUTO_AIM == 0   //不用预测
             Gimbal_Target.yaw_angle_target    = cmd.d1;
             Gimbal_Target.pitch_angle_target  = cmd.d2;
+#elif AUTO_AIM == 1   //kalman预测，参数未整定，不知是否可用
+            w_x = (cmd.d1 - Gimbal_Target.yaw_angle_target) / 2;
+            w_y = cmd.d2 - Gimbal_Target.pitch_angle_target;
+            kalman_filter_calc(&kalman_filter_F, cmd.d1, cmd.d2, 0, 0);
+            Gimbal_Target.yaw_angle_target   = angle_data[0];
+            Gimbal_Target.pitch_angle_target = angle_data[1];
+#else                 //移植上交的预测算法，未测试
+
+            if(cmd.d1 != last_yaw){
+                last_yaw = cmd.d1;
+                angle = aimProcess(cmd.d1, cmd.d2, &AimTic);
+            }
+            angle.yaw += 3;
+            angle.pitch -= 1.5;
+
+            Gimbal_Target.yaw_angle_target    = angle.yaw;
+            Gimbal_Target.pitch_angle_target  = angle.pitch;
+#endif
         }break;
         default:{
             
@@ -148,6 +175,7 @@ void UpperMonitorControlLoop(void){
 void GMYawPitchModeSwitch(void){
     static int16_t  Cruise_Time_Between = 0;
     static uint8_t  pitch_dowm_flag = 0;
+    static uint8_t  yaw_clockwise_flag = 0;
     static uint8_t  first_prepare_flag = 1;
     static uint8_t  first_cruise_flag = 1;
     switch(GetWorkState()){
@@ -168,8 +196,20 @@ void GMYawPitchModeSwitch(void){
 #if DEBUG_YAW_PID == 0
             Cruise_Time_Between++;
             if(Cruise_Time_Between > 10){
-                Gimbal_Target.yaw_angle_target += GIMBAL_YAW_CRUISE_DELTA;
-
+                if(yaw_clockwise_flag == 1){
+                    Gimbal_Target.yaw_angle_target += GIMBAL_YAW_CRUISE_DELTA;
+                }
+                else{
+                    Gimbal_Target.yaw_angle_target -= GIMBAL_YAW_CRUISE_DELTA;
+                }
+                
+                if(Gimbal_Target.yaw_angle_target >= 3600){
+                    yaw_clockwise_flag = 0;
+                }
+                else if(Gimbal_Target.yaw_angle_target <= -3600){
+                    yaw_clockwise_flag = 1;
+                }
+                
                 if(pitch_dowm_flag == 1){
                     Gimbal_Target.pitch_angle_target -= GIMBAL_PITCH_CRUISE_DELTA;
                 }
@@ -355,7 +395,7 @@ int8_t heat_control(volatile int16_t const current_heat, volatile float const cu
 #define RAMMER_TORQUE_THRESHOLD  11000  //堵转扭矩
 #define RAMMER_INVERSE_TIME_MS   1000   //反转时间
 #define RAMMER_INVERSE_SPEED     -1000  //反转速度
-#define RAMMER_NORMAL_SPEED      3000   //拨盘转速  转/min
+#define RAMMER_NORMAL_SPEED      3000   //拨盘高转速  转/min
 void ShootControlLoop(void){
     volatile static int8_t  heat_control_flag = 0;
     volatile static int16_t rammer_speed      = 0;
@@ -374,10 +414,16 @@ void ShootControlLoop(void){
     if (Get_Flag(Shoot) == 0 || Get_Flag(Auto_aim_debug) == 1 || heat_control_flag == 1 || pit_angle_limit_flag == 1){
         rammer_speed = 0;
     }
-    else{
+    else if(GET_PITCH_ANGLE > -10){
+        rammer_speed = 1000;
+    }
+    else if(GET_PITCH_ANGLE < -15 || Get_RunAway_State() == 0){
         rammer_speed = RAMMER_NORMAL_SPEED;
     }
-    
+    else{
+        rammer_speed = 2000;
+    }
+
     RammerSpeedPID(rammer_speed);
     Set_Rammer_Current(CAN1, (int16_t)RAMMERSpeedPID.output);
 }
@@ -482,6 +528,7 @@ void ControtTaskInit(void){
     GMYPositionPID.Reset(&GMYPositionPID);
     GMYSpeedPID.Reset(&GMYSpeedPID);
     friction_init();
+    kalman_filter_init(&kalman_filter_F, &kalman_filter_init_I);
 }
 
 /**
@@ -496,6 +543,7 @@ void Control_Task(void){
     if(minipc_alive_count++ == 1000){
         SetUpperMonitorOnline(0);
     }
+    if(AimTic<1000){AimTic++;}  //for auto aim forcasting
     WorkStateFSM();
     GMYawPitchModeSwitch();
     GMYawControlLoop();

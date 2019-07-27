@@ -7,7 +7,7 @@
 
 #define YAW_INIT_ANGLE              0.0f
 #define PITCH_INIT_ANGLE            -20.0f
-#define PITCH_MAX                   -10.0f
+#define PITCH_MAX                   0.0f
 #define PITCH_MIN                   -35.0f
 #define FRICTION_RAMP_TICK_COUNT    200
 
@@ -21,7 +21,7 @@
 #define YAW_SPEED_KI_DEFAULTS  0
 #define YAW_SPEED_KD_DEFAULTS  0
 
-#define PITCH_POSITION_KP_DEFAULTS  25
+#define PITCH_POSITION_KP_DEFAULTS  50
 #define PITCH_POSITION_KI_DEFAULTS  0.3
 #define PITCH_POSITION_KD_DEFAULTS  0
 
@@ -70,7 +70,7 @@ typedef enum{
     1000,\
     1500,\
     0,\
-    4900,\
+    30000,\
     0,\
     0,\
     0,\
@@ -93,7 +93,7 @@ typedef enum{
     1000,\
     1500,\
     0,\
-    4900,\
+    30000,\
     0,\
     0,\
     0,\

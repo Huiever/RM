@@ -31,13 +31,11 @@ int main(void){
 //        VisualScope(USART2, GMPPositionPID.fdb,GMPPositionPID.ref, GMPSpeedPID.fdb, GMPSpeedPID.ref);
 //        VisualScope(USART2, get_imu_wz(),get_imu_wy(), get_yaw_angle(), get_pit_angle());
 //        VisualScope(USART2, GMYPositionPID.fdb,GMYPositionPID.ref, imu.atti.yaw, imu_yaw_angle);
-//        printf("fdb:%f,ref:%f\r\n",GMPPositionPID.fdb,GMPPositionPID.ref);
+//        printf("fdb:%f,ref:%f,out:%f\r\n",GMPPositionPID.fdb,GMPPositionPID.ref,GMPSpeedPID.output);
         imu_main();
-        
         if(Get_Flag(Gimble_ok) == 1){
             miniPC_task();
         }
-
         delay_ms(2);
     }
 }

@@ -4,7 +4,7 @@
 #include "includes.h"
 #endif
 
-#if 1
+#if 0
 #pragma import(__use_no_semihosting)              
 struct __FILE {
     int handle; 

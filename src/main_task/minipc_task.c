@@ -14,14 +14,18 @@ volatile static  UpperMonitor_Ctr_t upperMonitorCmd = {0,GIMBAL_CMD_STOP,0,0};
 volatile static  package_t package = { 0x0a,0x0d,0xff,0x00,0x00,0x00,0x00,0x0d,0x0a };
 
 void miniPC_ACK_status(void){
+    int16_t yaw = (int16_t)GET_YAW_ANGLE;
+    int16_t pit = (int16_t)(GET_PITCH_ANGLE * 6);
     package.cmdid = 0x11;
-    package.data[0] = 0x00; 
-    package.data[1] = GET_YAW_ANGLE;
-    package.data[2] = GET_PITCH_ANGLE;
+    package.data[0] = ((uint8_t *)&yaw)[0]; 
+    package.data[1] = ((uint8_t *)&yaw)[1];
+    package.data[2] = ((uint8_t *)&pit)[0]; 
+    package.data[3] = ((uint8_t *)&pit)[1];     
     USART6_Print((uint8_t*)&package, 9);
 }
 void miniPC_HS_SYN(void) {
     package.cmdid = 0x09;
+    package.data[1] = My_Robot_Color;
     USART6_Print((uint8_t*)&package, 9);
 }
 
@@ -48,7 +52,6 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
     static const uint8_t SEND_STATUS             = 0x01;
     static const uint8_t GIMBAL_MOVEBY           = 0x02;
     static const uint8_t GIMBAL_MOVETO           = 0x03;
-    static const uint8_t REQUEST_CURR_STATE      = 0x08;
     static const uint8_t ACK                     = 0x10;
     static const uint8_t EXIT_UPPER_MONITOR_CTR  = 0x12;
     static const uint8_t CAMERA_ERROR            = 0xEE;
@@ -75,12 +78,8 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
             
             case GIMBAL_MOVETO:{
                 upperMonitorCmd.d1 = d1;
-                upperMonitorCmd.d2 = d2;
+                upperMonitorCmd.d2 = d2 / 6.0f;
                 upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVETO;
-            }break;
-            
-            case REQUEST_CURR_STATE:{
-                
             }break;
             
             case EXIT_UPPER_MONITOR_CTR:{

@@ -587,6 +587,11 @@
               <FileType>1</FileType>
               <FilePath>..\src\bsp\kalman_filter.c</FilePath>
             </File>
+            <File>
+              <FileName>auto_aim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\bsp\auto_aim.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

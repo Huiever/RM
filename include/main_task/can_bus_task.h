@@ -35,9 +35,12 @@ typedef struct{
 extern volatile rammer Rammer;
 extern volatile Encoder GMYawEncoder;
 extern volatile Encoder GMPitchEncoder;
+extern volatile uint8_t My_Robot_Color;
 
 uint16_t Get_Sentry_HeatData(void);
 float Get_Sentry_BulletSpeed(void);
+uint8_t Get_RunAway_State(void);
+
 void CanReceiveMsgProcess(CanRxMsg *msg);
 void EncoderProcess(volatile Encoder *v, CanRxMsg *msg);
 void Send_Gimbal_Info(uint8_t Flag_Shoot_State, uint8_t Control_Mode, int16_t ChassisSpeed);

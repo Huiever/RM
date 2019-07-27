@@ -6,7 +6,7 @@ typedef struct {
     uint8_t start1;
     uint8_t start2;
     uint8_t cmdid;
-    int8_t  data[4]; //int8_t
+    uint8_t data[4]; 
     uint8_t end1;
     uint8_t end2;
 }package_t;
@@ -31,6 +31,5 @@ void UpperMonitorDataProcess(volatile uint8_t *pData);
 
 void RequestFinishFrictionSpeedUp(void);
 void miniPC_task(void);
-
 
 #endif

@@ -6,6 +6,10 @@
 #define VAL_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define VAL_MAX(a, b) ((a) > (b) ? (a) : (b))
 
+/* Use auto_aim_predict or not   0       1         2
+                                null   kalman   auto_aim  */
+#define AUTO_AIM           2
+
 /* Specify the prepare time(ms) */
 #define PREPARE_TIME_MS             4000
 
@@ -35,7 +39,7 @@
 #define Monitor_rammer              0
 
 /* Change the encoder offset of pitch/yaw motor */
-#define Pit_Encoder_Offset          1970
+#define Pit_Encoder_Offset          1330
 
 /* Change the max duty of friction wheel,
    which is the max speed of friction wheel */

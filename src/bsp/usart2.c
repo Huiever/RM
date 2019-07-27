@@ -2,7 +2,23 @@
 #if EN_USART2_RX    
 u8 USART_RX_BUF_2[USART_REC_LEN];
 u16 USART_RX_STA_2=0;
+ #if 1
+#pragma import(__use_no_semihosting)              
+struct __FILE {
+    int handle; 
+}; 
 
+FILE __stdout; 
+void _sys_exit(int x){
+    x = x; 
+}
+
+int fputc(int ch, FILE *f){
+    while((USART2->SR&0X40)==0); 
+    USART2->DR = (u8) ch;  
+    return ch;
+}
+#endif
 void USART2_Init(u32 bound){
     GPIO_InitTypeDef GPIO_InitStructure;
     USART_InitTypeDef USART_InitStructure;

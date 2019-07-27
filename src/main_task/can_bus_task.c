@@ -10,8 +10,8 @@ volatile rammer Rammer = { 0, 0, 0 };
 
 volatile uint16_t Sentry_HeatData    = 0;
 volatile float Sentry_BulletSpeed = 0;
-volatile uint8_t  Flag_In_RunAwayState = 0;
-
+volatile uint8_t Flag_In_RunAwayState = 0;
+volatile uint8_t My_Robot_Color = 0;
 void EncoderProcess(volatile Encoder *v, CanRxMsg *msg){
     int i = 0;
     int32_t temp_sum  = 0;    
@@ -50,6 +50,8 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
         }break;
         case CAN_BUS1_Pitch_FEEDBACK_MSG_ID:{
             EncoderProcess(&GMPitchEncoder, msg);
+            //由于pitch电机反馈的角度和遥控器给定的角度变化方向相反，故取反
+            GMPitchEncoder.ecd_angle = -GMPitchEncoder.ecd_angle; 
         }break;
         case CAN_BUS1_Rammer_FEEDBACK_MSG_ID:{
             Rammer.angle  = msg->Data[0] << 8 | msg->Data[1];
@@ -59,6 +61,8 @@ void CanReceiveMsgProcess(CanRxMsg * msg){
         case ChassisSensor_ID:{
             Sentry_HeatData = msg->Data[0]<<8 | msg->Data[1];
             Sentry_BulletSpeed = msg->Data[2]<<8 | msg->Data[3];
+            My_Robot_Color = msg->Data[4];
+            Flag_In_RunAwayState = msg->Data[5];
         }break;
         default:{
             
@@ -132,4 +136,8 @@ float Get_Sentry_BulletSpeed(void){
 
 uint16_t Get_Sentry_HeatData(void){
     return Sentry_HeatData;
+}
+
+uint8_t Get_RunAway_State(void){
+    return Flag_In_RunAwayState;
 }
