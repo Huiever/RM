@@ -153,9 +153,6 @@ void UpperMonitorControlLoop(void){
                 last_yaw = cmd.d1;
                 angle = aimProcess(cmd.d1, cmd.d2, &AimTic);
             }
-            angle.yaw += 3;
-            angle.pitch -= 1.5;
-
             Gimbal_Target.yaw_angle_target    = angle.yaw;
             Gimbal_Target.pitch_angle_target  = angle.pitch;
 #endif
@@ -299,17 +296,16 @@ void GMYawControlLoop(void){
   */
 void GMPitchControlLoop(void){
 
-#if DEBUG_PICTH_PID == 1
-//    static int i=0;
-//    if(i==5000){
-//        Gimbal_Target.pitch_angle_target = 10;
-//    }
-//    else if(i>=10000){
-//        Gimbal_Target.pitch_angle_target = -10;
-//        i=0;
-//    }
-//    i++;
-    Gimbal_Target.pitch_angle_target = 0;
+#if 0
+    static int i=0;
+    if(i==5000){
+        Gimbal_Target.pitch_angle_target = -5;
+    }
+    else if(i>=10000){
+        Gimbal_Target.pitch_angle_target = -30;
+        i=0;
+    }
+    i++;
 #endif
     GimbalAngleLimit();
     
@@ -417,7 +413,7 @@ void ShootControlLoop(void){
     else if(GET_PITCH_ANGLE > -10){
         rammer_speed = 1000;
     }
-    else if(GET_PITCH_ANGLE < -15 || Get_RunAway_State() == 0){
+    else if(GET_PITCH_ANGLE < -15 && Get_RunAway_State() == 0){
         rammer_speed = RAMMER_NORMAL_SPEED;
     }
     else{
@@ -517,7 +513,6 @@ void SetFrictionState(FrictionWheelState_e v){
   * @retval         ·µ»Ø¿Õ
   */
 void ControtTaskInit(void){
-    SetWorkState(PREPARE_STATE); 
     GMPitchRamp.SetScale(&GMPitchRamp, PREPARE_TIME_TICK_MS);
     GMYawRamp.SetScale(&GMYawRamp, PREPARE_TIME_TICK_MS);
     GMPitchRamp.ResetCounter(&GMPitchRamp);
@@ -529,6 +524,7 @@ void ControtTaskInit(void){
     GMYSpeedPID.Reset(&GMYSpeedPID);
     friction_init();
     kalman_filter_init(&kalman_filter_F, &kalman_filter_init_I);
+    SetWorkState(PREPARE_STATE); 
 }
 
 /**

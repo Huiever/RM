@@ -23,6 +23,7 @@ struct _m_usmart_nametab usmart_nametab[]=
 //函数控制管理器初始化
 //得到各个受控函数的名字
 //得到函数总数量
+
 struct _m_usmart_dev usmart_dev=
 {
     usmart_nametab,

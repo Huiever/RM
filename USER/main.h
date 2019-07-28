@@ -8,7 +8,7 @@
 
 /* Use auto_aim_predict or not   0       1         2
                                 null   kalman   auto_aim  */
-#define AUTO_AIM           2
+#define AUTO_AIM           0
 
 /* Specify the prepare time(ms) */
 #define PREPARE_TIME_MS             4000

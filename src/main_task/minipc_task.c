@@ -14,7 +14,7 @@ volatile static  UpperMonitor_Ctr_t upperMonitorCmd = {0,GIMBAL_CMD_STOP,0,0};
 volatile static  package_t package = { 0x0a,0x0d,0xff,0x00,0x00,0x00,0x00,0x0d,0x0a };
 
 void miniPC_ACK_status(void){
-    int16_t yaw = (int16_t)GET_YAW_ANGLE;
+    int16_t yaw = (int16_t)GET_YAW_ANGLE * 5;
     int16_t pit = (int16_t)(GET_PITCH_ANGLE * 6);
     package.cmdid = 0x11;
     package.data[0] = ((uint8_t *)&yaw)[0]; 
@@ -77,7 +77,7 @@ void UpperMonitorDataProcess(volatile uint8_t *pData){
             }break;
             
             case GIMBAL_MOVETO:{
-                upperMonitorCmd.d1 = d1;
+                upperMonitorCmd.d1 = d1 / 5.0f;
                 upperMonitorCmd.d2 = d2 / 6.0f;
                 upperMonitorCmd.gimbalMovingCtrType = GIMBAL_CMD_MOVETO;
             }break;

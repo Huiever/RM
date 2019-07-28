@@ -10,7 +10,7 @@ GMAngle_t aimProcess(float yaw,float pit,int16_t *tic){
     3.在循环里速度线性累加与指数衰减对抗
     4.基于pitch的重力下坠补偿
 */
-    #define amt 10                //间隔点个数amount，调节amt使时间间隔大约为50ms，即 amt=50ms/1000ms*fps
+    #define amt 3                //间隔点个数amount，调节amt使时间间隔大约为50ms，即 amt=50ms/1000ms*fps
     static int8_t i, lock;        //计数器，首次进入保护锁
     static float y[amt], p[amt],  //yaw,pit历史
                  tSum, t[amt],    //间隔时间,tic历史
